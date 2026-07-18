@@ -78,18 +78,15 @@ async function main() {
   // Get or create the form
   const form = pdf.getOrCreateForm();
 
-  // Create an unsigned signature field
-  // Note: Signature fields are invisible until signed. The visual "signature area"
-  // is just drawn content (like the rectangle above). When the document is signed,
-  // the signature field will be positioned automatically.
+  // Create an unsigned signature field. The drawn rectangle is a visual guide;
+  // pass appearance.placements to pdf.sign() to create a visible widget there.
   console.log("Creating signature field...");
   const signatureField = form.createSignatureField("Signature1");
 
   console.log(`Created signature field: ${signatureField.name}`);
   console.log(`  Is signed: ${signatureField.isSigned()}`);
 
-  // Create a second signature field for a witness
-  // The visual area is drawn content - signature fields are invisible until signed
+  // Create a second signature field for a witness.
   page.drawText("Witness:", {
     x: 350,
     y: page.height - 600,

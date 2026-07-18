@@ -13,6 +13,7 @@ This document captures the high-level goals for @libpdf/core. Use this to steer 
 ### 2. Digital Signatures
 
 - [x] **Add digital signatures** — Sign PDFs with certificates (P12, CryptoKey signers)
+- [x] **Visible signature appearances** — Built-in text/image layouts, custom providers, and multi-page widgets
 - [ ] **Verify signatures** — Validate existing signatures
 - [x] **LTV (Long-Term Validation)** — Embed CRLs, OCSP responses for long-term validity
 - [x] **DSS (Document Security Store)** — Full DSS support for archival signatures

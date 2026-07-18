@@ -190,6 +190,7 @@ PDF digital signature creation with PAdES compliance.
 | `dss.ts`         | Document Security Store for LTV data         |
 | `aia.ts`         | Authority Information Access chain building  |
 | `sign.ts`        | Main signing orchestration                   |
+| `appearance.ts`  | Visible signature Form XObject generation    |
 
 ### Crypto Utilities (`src/signatures/crypto/`)
 

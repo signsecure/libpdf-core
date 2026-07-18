@@ -164,9 +164,91 @@ const keyPair = await crypto.subtle.generateKey(
 
 ## Visible Signatures
 
-Visible signature appearances are not yet implemented. Currently, all signatures are invisible (the signature is embedded in the PDF but doesn't appear visually on any page).
+Add an `appearance` to render the signature on one or more pages. Coordinates use PDF points,
+the origin is at the bottom-left of the page, and page indexes are zero-based.
 
-For now, you can add visual elements like text or images separately using the drawing API, then sign the document.
+```ts
+import { PDF, P12Signer, rgb } from "@libpdf/core";
+
+const pdf = await PDF.load(documentBytes);
+const signer = await P12Signer.create(p12Bytes, "certificate-password");
+
+const { bytes } = await pdf.sign({
+  signer,
+  reason: "Approved for release",
+  location: "Mumbai",
+  appearance: {
+    placements: [
+      {
+        pageIndex: 0,
+        rect: { x: 48, y: 72, width: 420, height: 112 },
+      },
+    ],
+    mode: "graphic-and-description",
+    graphic: signatureImageBytes,
+    graphicRatio: 0.32,
+    backgroundColor: rgb(0.97, 0.98, 1),
+    borderColor: rgb(0.16, 0.32, 0.62),
+  },
+});
+```
+
+The default description includes the certificate common name, signing date, reason, and location.
+Use `text` or `signerName` to override it.
+
+### Rendering Modes
+
+| Mode                      | Content                                 |
+| ------------------------- | --------------------------------------- |
+| `description`             | Signer metadata or custom text          |
+| `name-and-description`    | Signer name beside the description      |
+| `graphic-and-description` | PNG/JPEG graphic beside the description |
+| `graphic`                 | PNG/JPEG graphic only                   |
+
+Text is automatically wrapped and fitted. You can also provide a standard 14 or embedded font,
+fixed or minimum/maximum font sizes, text alignment and color, a background image, padding, a
+border, and an optional status band. For fully custom content, provide an async `provider` that
+returns a Form XObject stream using the callback context's `createStream()` helper.
+
+### Repeat an Appearance
+
+Use `pageIndex: "all"` to create a widget on every page at the same coordinates:
+
+```ts
+await pdf.sign({
+  signer,
+  appearance: {
+    placements: [
+      {
+        pageIndex: "all",
+        rect: { x: 36, y: 36, width: 240, height: 64 },
+      },
+    ],
+  },
+});
+```
+
+You can also supply several placements with different pages or rectangles. They all represent the
+same cryptographic signature field.
+
+### Reuse an Existing Visible Field
+
+When a PDF already contains a positioned signature widget, omit `placements` to preserve its page
+and rectangle while generating a new appearance:
+
+```ts
+await pdf.sign({
+  signer,
+  fieldName: "ApprovalSignature",
+  appearance: {
+    mode: "description",
+    statusText: "APPROVED",
+  },
+});
+```
+
+If `appearance` is omitted entirely, existing widget positions and appearances are preserved. A new
+field without an `appearance` remains an invisible signature, matching the previous behavior.
 
 ## Signature Fields
 
@@ -380,7 +462,6 @@ signDocument().catch(console.error);
 
 - **Verification not implemented** - LibPDF can sign but not verify signatures
 - **LTV requires network** - B-LT and B-LTA need access to OCSP/CRL servers
-- **Visible signatures not supported** - All signatures are invisible (no visual appearance on pages)
 
 ## Next Steps
 

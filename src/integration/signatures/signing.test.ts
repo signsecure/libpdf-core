@@ -6,6 +6,11 @@
  */
 
 import { PDF } from "#src/api/pdf";
+import { rgb } from "#src/helpers/colors";
+import { PdfArray } from "#src/objects/pdf-array";
+import { PdfDict } from "#src/objects/pdf-dict";
+import { PdfName } from "#src/objects/pdf-name";
+import { PdfNumber } from "#src/objects/pdf-number";
 import { P12Signer } from "#src/signatures/signers";
 import { HttpTimestampAuthority } from "#src/signatures/timestamp";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
@@ -96,6 +101,171 @@ describe("signing integration", () => {
       expect(pdfStr).toContain("/Location (New York)");
       expect(pdfStr).toContain("/ContactInfo (test@example.com)");
       expect(pdfStr).toContain("/M (D:20250105120000Z)");
+    });
+  });
+
+  describe("visible signature appearances", () => {
+    it("creates a visible signature widget with a generated appearance", async () => {
+      const pdfBytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(pdfBytes);
+      const signer = await loadTestSigner();
+
+      const { bytes } = await pdf.sign({
+        signer,
+        fieldName: "ApprovalSignature",
+        reason: "Approved",
+        signingTime: new Date("2026-07-18T10:30:00Z"),
+        appearance: {
+          placements: [
+            {
+              pageIndex: 0,
+              rect: { x: 72, y: 72, width: 240, height: 80 },
+            },
+          ],
+          text: "Approved for release",
+          backgroundColor: rgb(0.96, 0.98, 1),
+          borderColor: rgb(0.2, 0.4, 0.7),
+        },
+      });
+
+      const signedPdf = await PDF.load(bytes);
+      const field = signedPdf.getForm()?.getSignatureField("ApprovalSignature");
+      const widgets = field?.getWidgets() ?? [];
+
+      expect(widgets).toHaveLength(1);
+      expect(widgets[0].rect).toEqual([72, 72, 312, 152]);
+      expect(widgets[0].pageRef?.objectNumber).toBe(signedPdf.getPage(0)?.ref.objectNumber);
+
+      const appearance = widgets[0].getNormalAppearance();
+      expect(appearance).not.toBeNull();
+      expect(appearance?.getName("Subtype")?.value).toBe("Form");
+      expect(appearance?.getArray("BBox")?.length).toBe(4);
+    });
+
+    it("creates repeated widgets on every page", async () => {
+      const source = PDF.create();
+      source.addPage();
+      source.addPage();
+      source.addPage();
+
+      const pdf = await PDF.load(await source.save());
+      const signer = await loadTestSigner();
+
+      const { bytes } = await pdf.sign({
+        signer,
+        fieldName: "EveryPageSignature",
+        appearance: {
+          placements: [
+            {
+              pageIndex: "all",
+              rect: { x: 36, y: 36, width: 180, height: 54 },
+            },
+          ],
+          mode: "name-and-description",
+          signerName: "Alice Example",
+        },
+      });
+
+      const signedPdf = await PDF.load(bytes);
+      const widgets =
+        signedPdf.getForm()?.getSignatureField("EveryPageSignature")?.getWidgets() ?? [];
+
+      expect(widgets).toHaveLength(3);
+      expect(widgets.every(widget => widget.getNormalAppearance() !== null)).toBe(true);
+      expect(new Set(widgets.map(widget => widget.pageRef?.objectNumber)).size).toBe(3);
+    });
+
+    it("preserves a pre-allocated visible widget when no new appearance is supplied", async () => {
+      const source = PDF.create();
+      const page = source.addPage();
+      const field = source.getOrCreateForm().createSignatureField("ExistingVisibleSignature");
+      const fieldRef = field.getRef();
+
+      if (!fieldRef) {
+        throw new Error("Signature field was not registered");
+      }
+
+      const widget = field.addWidget(
+        PdfDict.of({
+          Type: PdfName.of("Annot"),
+          Subtype: PdfName.of("Widget"),
+          Rect: new PdfArray([
+            PdfNumber.of(48),
+            PdfNumber.of(60),
+            PdfNumber.of(248),
+            PdfNumber.of(120),
+          ]),
+          P: page.ref,
+          Parent: fieldRef,
+          F: PdfNumber.of(4),
+        }),
+      );
+
+      const annots = new PdfArray([widget.ref!]);
+      page.dict.set("Annots", annots);
+
+      const pdf = await PDF.load(await source.save());
+      const signer = await loadTestSigner();
+      const { bytes } = await pdf.sign({
+        signer,
+        fieldName: "ExistingVisibleSignature",
+      });
+
+      const signedPdf = await PDF.load(bytes);
+      const widgets =
+        signedPdf.getForm()?.getSignatureField("ExistingVisibleSignature")?.getWidgets() ?? [];
+
+      expect(widgets).toHaveLength(1);
+      expect(widgets[0].rect).toEqual([48, 60, 248, 120]);
+      expect(widgets[0].pageRef?.objectNumber).toBe(signedPdf.getPage(0)?.ref.objectNumber);
+    });
+
+    it("regenerates an existing widget appearance without moving it", async () => {
+      const source = PDF.create();
+      const page = source.addPage();
+      const field = source.getOrCreateForm().createSignatureField("ExistingAppearance");
+      const fieldRef = field.getRef();
+
+      if (!fieldRef) {
+        throw new Error("Signature field was not registered");
+      }
+
+      const widget = field.addWidget(
+        PdfDict.of({
+          Type: PdfName.of("Annot"),
+          Subtype: PdfName.of("Widget"),
+          Rect: new PdfArray([
+            PdfNumber.of(40),
+            PdfNumber.of(50),
+            PdfNumber.of(260),
+            PdfNumber.of(120),
+          ]),
+          P: page.ref,
+          Parent: fieldRef,
+          F: PdfNumber.of(4),
+        }),
+      );
+
+      page.dict.set("Annots", new PdfArray([widget.ref!]));
+
+      const pdf = await PDF.load(await source.save());
+      const signer = await loadTestSigner();
+      const { bytes } = await pdf.sign({
+        signer,
+        fieldName: "ExistingAppearance",
+        appearance: {
+          text: "Existing widget appearance",
+          backgroundColor: rgb(0.96, 0.98, 1),
+        },
+      });
+
+      const signedPdf = await PDF.load(bytes);
+      const widgets =
+        signedPdf.getForm()?.getSignatureField("ExistingAppearance")?.getWidgets() ?? [];
+
+      expect(widgets).toHaveLength(1);
+      expect(widgets[0].rect).toEqual([40, 50, 260, 120]);
+      expect(widgets[0].getNormalAppearance()).not.toBeNull();
     });
   });
 
