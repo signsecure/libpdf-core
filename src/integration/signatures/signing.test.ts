@@ -11,6 +11,8 @@ import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
+import { PdfRef } from "#src/objects/pdf-ref";
+import { PdfStream } from "#src/objects/pdf-stream";
 import { P12Signer } from "#src/signatures/signers";
 import { HttpTimestampAuthority } from "#src/signatures/timestamp";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
@@ -140,6 +142,61 @@ describe("signing integration", () => {
       expect(appearance).not.toBeNull();
       expect(appearance?.getName("Subtype")?.value).toBe("Form");
       expect(appearance?.getArray("BBox")?.length).toBe(4);
+    });
+
+    it("writes a reloadable OpenPDF-compatible n0-n4 appearance stack", async () => {
+      const pdfBytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(pdfBytes);
+      const signer = await loadTestSigner();
+
+      const { bytes } = await pdf.sign({
+        signer,
+        fieldName: "LayeredSignature",
+        appearance: {
+          placements: [
+            {
+              pageIndex: 0,
+              rect: { x: 20, y: 20, width: 170, height: 60 },
+            },
+          ],
+          legacyLayers: {
+            validity: "valid",
+            statusText: "SIGNED AND VALID",
+          },
+        },
+      });
+
+      const signedPdf = await PDF.load(bytes);
+      const appearance = signedPdf
+        .getForm()
+        ?.getSignatureField("LayeredSignature")
+        ?.getWidgets()[0]
+        ?.getNormalAppearance();
+      const formRef = appearance?.getDict("Resources")?.getDict("XObject")?.get("FRM");
+
+      expect(formRef).toBeInstanceOf(PdfRef);
+
+      if (!(formRef instanceof PdfRef)) {
+        throw new Error("FRM resource was not registered");
+      }
+
+      const form = signedPdf.context.registry.resolve(formRef);
+
+      expect(form).toBeInstanceOf(PdfStream);
+
+      if (!(form instanceof PdfStream)) {
+        throw new Error("FRM resource was not a stream");
+      }
+
+      const layers = form.getDict("Resources")?.getDict("XObject");
+
+      expect(layers ? [...layers.keys()].map(key => key.value) : []).toEqual([
+        "n0",
+        "n1",
+        "n2",
+        "n3",
+        "n4",
+      ]);
     });
 
     it("creates repeated widgets on every page", async () => {

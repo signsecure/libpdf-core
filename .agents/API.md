@@ -241,6 +241,10 @@ const signed = await pdf.sign({
     placements: [{ pageIndex: 0, rect: { x: 48, y: 72, width: 420, height: 112 } }],
     mode: "graphic-and-description",
     graphic: pngBytes,
+    legacyLayers: {
+      validity: "valid", // static artwork; does not perform verification
+      statusText: "SIGNED AND VALID",
+    },
   },
 });
 

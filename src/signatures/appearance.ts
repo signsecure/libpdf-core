@@ -1,14 +1,19 @@
 /**
  * Visible digital signature appearance generation.
  *
- * The built-in layouts mirror the useful rendering modes from OpenPDF while
- * producing modern Form XObject appearances without legacy verification
- * layers. A provider callback remains available for fully custom streams.
+ * The built-in layouts mirror the useful rendering modes from OpenPDF and can
+ * optionally produce its legacy n0-n4 Form XObject layer stack. A provider
+ * callback remains available for fully custom main appearance streams.
  */
 
 import type { PDF } from "#src/api/pdf";
 import type { Operator } from "#src/content/operators";
-import { drawRectangleOps, setFillColor } from "#src/drawing/operations";
+import {
+  drawCircleOps,
+  drawRectangleOps,
+  setFillColor,
+  wrapPathOps,
+} from "#src/drawing/operations";
 import { serializeOperators } from "#src/drawing/serialize";
 import { layoutText } from "#src/drawing/text-layout";
 import type { FontInput } from "#src/drawing/types";
@@ -19,13 +24,15 @@ import {
   isWinAnsiStandard14,
   type Standard14FontName,
 } from "#src/fonts/standard-14";
-import { black } from "#src/helpers/colors";
+import { black, rgb, white, type Color } from "#src/helpers/colors";
 import {
   beginText,
   clip,
   concatMatrix,
   endPath,
   endText,
+  lineTo,
+  moveTo,
   paintXObject,
   popGraphicsState,
   pushGraphicsState,
@@ -46,6 +53,7 @@ import { parseCertificate } from "./formats/common";
 import {
   SignatureError,
   type SignatureAppearanceImage,
+  type SignatureAppearanceLegacyLayersOptions,
   type SignatureAppearanceOptions,
   type SignatureAppearanceProviderContext,
 } from "./types";
@@ -80,10 +88,22 @@ interface ResolvedAssets {
 }
 
 const DEFAULT_FONT: Standard14FontName = "Helvetica";
+const VALID_COLOR = rgb(0.12, 0.62, 0.29);
+const UNKNOWN_COLOR = rgb(0.9, 0.62, 0.08);
+const INVALID_COLOR = rgb(0.78, 0.16, 0.16);
+
+interface ResolvedLegacyLayersOptions {
+  validity: "unknown" | "valid" | "invalid";
+  statusText: string;
+  markColor: Color;
+  statusTextColor: Color;
+  showMark: boolean;
+}
 
 /** Generate built-in or provider-based visible signature appearances. */
 export class SignatureAppearanceGenerator {
   private constructor(
+    private readonly pdf: PDF,
     private readonly options: SignatureAppearanceOptions,
     private readonly metadata: SignatureAppearanceMetadata,
     private readonly assets: ResolvedAssets,
@@ -107,11 +127,13 @@ export class SignatureAppearanceGenerator {
       assets.backgroundImage = resolveImage(pdf, options.backgroundImage);
     }
 
-    return new SignatureAppearanceGenerator(options, metadata, assets);
+    return new SignatureAppearanceGenerator(pdf, options, metadata, assets);
   }
 
   /** Generate a Form XObject for one widget placement. */
   async generate(context: SignatureAppearanceRenderContext): Promise<PdfStream> {
+    let mainAppearance: PdfStream;
+
     if (this.options.provider) {
       const providerContext: SignatureAppearanceProviderContext = {
         ...context,
@@ -128,10 +150,16 @@ export class SignatureAppearanceGenerator {
       };
       const stream = await this.options.provider(providerContext);
 
-      return normalizeAppearanceStream(stream, context);
+      mainAppearance = normalizeAppearanceStream(stream, context);
+    } else {
+      mainAppearance = this.generateBuiltIn(context);
     }
 
-    return this.generateBuiltIn(context);
+    const legacyLayers = resolveLegacyLayersOptions(this.options.legacyLayers);
+
+    return legacyLayers
+      ? this.generateLegacyLayers(context, mainAppearance, legacyLayers)
+      : mainAppearance;
   }
 
   private generateBuiltIn(context: SignatureAppearanceRenderContext): PdfStream {
@@ -139,6 +167,7 @@ export class SignatureAppearanceGenerator {
     const padding = this.options.padding ?? 2;
     const font = this.options.font ?? DEFAULT_FONT;
     const resources = buildResources(font, this.assets);
+    const legacyLayers = resolveLegacyLayersOptions(this.options.legacyLayers);
     const ops = [pushGraphicsState(), rectangle(0, 0, width, height), clip(), endPath()];
 
     if (this.options.backgroundColor) {
@@ -165,7 +194,16 @@ export class SignatureAppearanceGenerator {
 
     let contentBox = insetBox({ x: 0, y: 0, width, height }, padding);
 
-    if (this.options.statusText) {
+    if (legacyLayers) {
+      const statusHeight = contentBox.height * 0.3;
+
+      contentBox = {
+        x: contentBox.x,
+        y: contentBox.y,
+        width: contentBox.width,
+        height: Math.max(0, contentBox.height - statusHeight - padding),
+      };
+    } else if (this.options.statusText) {
       const statusHeight = contentBox.height * 0.3;
       const statusBox = {
         x: contentBox.x,
@@ -236,7 +274,185 @@ export class SignatureAppearanceGenerator {
     return normalizeAppearanceStream(stream, context);
   }
 
-  private drawText(ops: Operator[], text: string, box: Box, font: FontInput): void {
+  /** Wrap the main n2 appearance in the historical n0-n4/FRM structure. */
+  private generateLegacyLayers(
+    context: SignatureAppearanceRenderContext,
+    mainAppearance: PdfStream,
+    options: ResolvedLegacyLayersOptions,
+  ): PdfStream {
+    const registry = this.pdf.context.registry;
+    const n0 = createBlankLayer(context);
+    const n1 =
+      options.validity === "unknown" && options.showMark
+        ? this.createValidityLayer(context, options)
+        : createBlankLayer(context);
+    const n3 =
+      options.validity !== "unknown" && options.showMark
+        ? this.createValidityLayer(context, options)
+        : createBlankLayer(context);
+    const n4 = this.createStatusLayer(context, options);
+    const layerResources = new PdfDict();
+
+    layerResources.set("n0", registry.register(n0));
+    layerResources.set("n1", registry.register(n1));
+    layerResources.set("n2", registry.register(mainAppearance));
+    layerResources.set("n3", registry.register(n3));
+    layerResources.set("n4", registry.register(n4));
+
+    const form = new PdfStream(
+      [],
+      serializeOperators([
+        pushGraphicsState(),
+        paintXObject("n0"),
+        paintXObject("n1"),
+        paintXObject("n2"),
+        paintXObject("n3"),
+        paintXObject("n4"),
+        popGraphicsState(),
+      ]),
+    );
+
+    form.set("Resources", PdfDict.of({ XObject: layerResources }));
+    normalizeAppearanceStream(form, context);
+
+    const formRef = registry.register(form);
+    const appearance = new PdfStream(
+      [],
+      serializeOperators([pushGraphicsState(), paintXObject("FRM"), popGraphicsState()]),
+    );
+
+    appearance.set("Resources", PdfDict.of({ XObject: PdfDict.of({ FRM: formRef }) }));
+
+    return normalizeAppearanceStream(appearance, context);
+  }
+
+  /** Create the n1/n3 validity mark inside the top status band. */
+  private createValidityLayer(
+    context: SignatureAppearanceRenderContext,
+    options: ResolvedLegacyLayersOptions,
+  ): PdfStream {
+    const { width, height } = context;
+    const padding = this.options.padding ?? 2;
+    const diameter = validityMarkDiameter(width, height, padding);
+    const radius = diameter / 2;
+    const centerX = padding + radius;
+    const centerY = height - height * 0.15;
+    const ops: Operator[] = [
+      pushGraphicsState(),
+      rectangle(0, 0, width, height),
+      clip(),
+      endPath(),
+    ];
+
+    if (diameter > 0) {
+      ops.push(
+        ...drawCircleOps({
+          cx: centerX,
+          cy: centerY,
+          radius,
+          fillColor: options.markColor,
+        }),
+      );
+
+      if (options.validity === "valid") {
+        ops.push(
+          ...wrapPathOps(
+            [
+              moveTo(centerX - radius * 0.5, centerY),
+              lineTo(centerX - radius * 0.1, centerY - radius * 0.38),
+              lineTo(centerX + radius * 0.58, centerY + radius * 0.45),
+            ],
+            {
+              strokeColor: white,
+              strokeWidth: Math.max(1, radius * 0.22),
+              lineCap: "round",
+              lineJoin: "round",
+            },
+          ),
+        );
+      } else if (options.validity === "invalid") {
+        ops.push(
+          ...wrapPathOps(
+            [
+              moveTo(centerX - radius * 0.42, centerY - radius * 0.42),
+              lineTo(centerX + radius * 0.42, centerY + radius * 0.42),
+              moveTo(centerX - radius * 0.42, centerY + radius * 0.42),
+              lineTo(centerX + radius * 0.42, centerY - radius * 0.42),
+            ],
+            {
+              strokeColor: white,
+              strokeWidth: Math.max(1, radius * 0.2),
+              lineCap: "round",
+            },
+          ),
+        );
+      } else {
+        this.drawText(
+          ops,
+          "?",
+          {
+            x: centerX - radius,
+            y: centerY - radius,
+            width: diameter,
+            height: diameter,
+          },
+          this.options.font ?? DEFAULT_FONT,
+          white,
+          "center",
+        );
+      }
+    }
+
+    ops.push(popGraphicsState());
+
+    const stream = new PdfStream([], serializeOperators(ops));
+
+    if (options.validity === "unknown") {
+      stream.set("Resources", buildResources(this.options.font ?? DEFAULT_FONT, {}));
+    }
+
+    return normalizeAppearanceStream(stream, context);
+  }
+
+  /** Create the n4 validity status text. */
+  private createStatusLayer(
+    context: SignatureAppearanceRenderContext,
+    options: ResolvedLegacyLayersOptions,
+  ): PdfStream {
+    const { width, height } = context;
+    const padding = this.options.padding ?? 2;
+    const markWidth = options.showMark ? validityMarkDiameter(width, height, padding) + padding : 0;
+    const ops: Operator[] = [];
+
+    this.drawText(
+      ops,
+      options.statusText,
+      {
+        x: padding + markWidth,
+        y: height * 0.7 + padding,
+        width: Math.max(0, width - padding * 2 - markWidth),
+        height: Math.max(0, height * 0.3 - padding * 2),
+      },
+      this.options.font ?? DEFAULT_FONT,
+      options.statusTextColor,
+      "left",
+    );
+
+    const stream = new PdfStream([], serializeOperators(ops));
+
+    stream.set("Resources", buildResources(this.options.font ?? DEFAULT_FONT, {}));
+
+    return normalizeAppearanceStream(stream, context);
+  }
+
+  private drawText(
+    ops: Operator[],
+    text: string,
+    box: Box,
+    font: FontInput,
+    color: Color = this.options.textColor ?? black,
+    align: "left" | "center" | "right" = this.options.textAlign ?? "left",
+  ): void {
     if (!text || box.width <= 0 || box.height <= 0) {
       return;
     }
@@ -245,13 +461,12 @@ export class SignatureAppearanceGenerator {
     const lineHeight = fontSize * 1.2;
     const layout = layoutText(text, font, fontSize, box.width, lineHeight);
     const ascent = getAscent(font, fontSize);
-    const align = this.options.textAlign ?? "left";
 
     ops.push(pushGraphicsState());
     ops.push(rectangle(box.x, box.y, box.width, box.height));
     ops.push(clip());
     ops.push(endPath());
-    ops.push(setFillColor(this.options.textColor ?? black));
+    ops.push(setFillColor(color));
     ops.push(beginText());
     ops.push(setFont("/F0", fontSize));
 
@@ -299,6 +514,44 @@ export function extractCertificateCommonName(certificateDer: Uint8Array): string
   }
 
   return "Unknown signer";
+}
+
+function resolveLegacyLayersOptions(
+  value: SignatureAppearanceOptions["legacyLayers"],
+): ResolvedLegacyLayersOptions | null {
+  if (!value) {
+    return null;
+  }
+
+  const options: SignatureAppearanceLegacyLayersOptions = value === true ? {} : value;
+  const validity = options.validity ?? "unknown";
+  const defaultColor =
+    validity === "valid" ? VALID_COLOR : validity === "invalid" ? INVALID_COLOR : UNKNOWN_COLOR;
+  const defaultStatus =
+    validity === "valid"
+      ? "SIGNED AND VALID"
+      : validity === "invalid"
+        ? "SIGNATURE INVALID"
+        : "SIGNATURE NOT VERIFIED";
+
+  return {
+    validity,
+    statusText: options.statusText ?? defaultStatus,
+    markColor: options.markColor ?? defaultColor,
+    statusTextColor: options.statusTextColor ?? options.markColor ?? defaultColor,
+    showMark: options.showMark ?? true,
+  };
+}
+
+function createBlankLayer(context: SignatureAppearanceRenderContext): PdfStream {
+  return normalizeAppearanceStream(
+    new PdfStream([], new TextEncoder().encode("% DSBlank\n")),
+    context,
+  );
+}
+
+function validityMarkDiameter(width: number, height: number, padding: number): number {
+  return Math.max(0, Math.min(height * 0.3 - padding * 2, width * 0.16));
 }
 
 function validateOptions(options: SignatureAppearanceOptions): void {

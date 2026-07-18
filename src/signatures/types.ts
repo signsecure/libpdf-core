@@ -61,6 +61,34 @@ export interface SignatureAppearancePlacement {
 /** Image input accepted by signature appearance options. */
 export type SignatureAppearanceImage = Uint8Array | PDFImage;
 
+/** Static validity artwork rendered into OpenPDF-compatible appearance layers. */
+export type SignatureAppearanceValidity = "unknown" | "valid" | "invalid";
+
+/** Options for the legacy `n0`-`n4` signature appearance layer stack. */
+export interface SignatureAppearanceLegacyLayersOptions {
+  /**
+   * Static validity state used for the mark and default status text.
+   * This does not verify the signature or affect a viewer's trust decision.
+   * Defaults to `"unknown"`.
+   */
+  validity?: SignatureAppearanceValidity;
+
+  /**
+   * Replacement `n4` status text. Defaults to a label matching `validity`.
+   * Set this only when the application has independently established the claim.
+   */
+  statusText?: string;
+
+  /** Color of the validity mark. Defaults to green, amber, or red by state. */
+  markColor?: Color;
+
+  /** Color of the `n4` status text. Defaults to `markColor`. */
+  statusTextColor?: Color;
+
+  /** Show the validity mark in the status band. Defaults to `true`. */
+  showMark?: boolean;
+}
+
 /** Metadata supplied to a custom signature appearance provider. */
 export interface SignatureAppearanceProviderContext {
   /** Zero-based page index for the widget being rendered. */
@@ -157,8 +185,15 @@ export interface SignatureAppearanceOptions {
   statusText?: string;
 
   /**
-   * Fully custom appearance provider. When supplied, built-in layout and
-   * styling options are ignored for the generated stream.
+   * Build an OpenPDF-compatible `n0`-`n4` appearance stack.
+   * `true` enables the safe `unknown` / `SIGNATURE NOT VERIFIED` state.
+   */
+  legacyLayers?: boolean | SignatureAppearanceLegacyLayersOptions;
+
+  /**
+   * Fully custom main appearance provider. When supplied, built-in layout and
+   * styling options are ignored. `legacyLayers`, when enabled, wraps this
+   * stream as `n2`.
    */
   provider?: SignatureAppearanceProvider;
 }

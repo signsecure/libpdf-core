@@ -1,6 +1,8 @@
 import { PDF } from "#src/api/pdf";
 import { rgb } from "#src/helpers/colors";
 import { PdfNumber } from "#src/objects/pdf-number";
+import { PdfRef } from "#src/objects/pdf-ref";
+import { PdfStream } from "#src/objects/pdf-stream";
 import { loadFixture } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
@@ -80,6 +82,85 @@ describe("SignatureAppearanceGenerator", () => {
 
     expect(stream.getDict("Resources")?.getDict("XObject")?.size).toBe(1);
     expect(new TextDecoder().decode(stream.getDecodedData())).toContain("/Im0 Do");
+  });
+
+  it("builds OpenPDF-compatible n0-n4 layers with a green validity mark", async () => {
+    const pdf = PDF.create();
+    pdf.addPage();
+
+    const generator = SignatureAppearanceGenerator.create(
+      pdf,
+      {
+        text: "Signed by Alice Example",
+        legacyLayers: {
+          validity: "valid",
+          statusText: "SIGNED AND VALID",
+        },
+      },
+      metadata,
+    );
+
+    const stream = await generator.generate({
+      pageIndex: 0,
+      width: 300,
+      height: 90,
+      rotation: 0,
+    });
+    const registry = pdf.context.registry;
+    const formRef = stream.getDict("Resources")?.getDict("XObject")?.get("FRM");
+
+    expect(new TextDecoder().decode(stream.getDecodedData())).toContain("/FRM Do");
+    expect(formRef).toBeInstanceOf(PdfRef);
+
+    if (!(formRef instanceof PdfRef)) {
+      throw new Error("FRM resource was not registered");
+    }
+
+    const form = registry.resolve(formRef);
+
+    expect(form).toBeInstanceOf(PdfStream);
+
+    if (!(form instanceof PdfStream)) {
+      throw new Error("FRM resource was not a stream");
+    }
+
+    const layers = form.getDict("Resources")?.getDict("XObject");
+
+    expect(layers ? [...layers.keys()].map(key => key.value) : []).toEqual([
+      "n0",
+      "n1",
+      "n2",
+      "n3",
+      "n4",
+    ]);
+
+    const validMarkRef = layers?.get("n3");
+    const statusRef = layers?.get("n4");
+
+    expect(validMarkRef).toBeInstanceOf(PdfRef);
+    expect(statusRef).toBeInstanceOf(PdfRef);
+
+    if (!(validMarkRef instanceof PdfRef) || !(statusRef instanceof PdfRef)) {
+      throw new Error("Legacy validity resources were not registered");
+    }
+
+    const validMark = registry.resolve(validMarkRef);
+    const status = registry.resolve(statusRef);
+
+    expect(validMark).toBeInstanceOf(PdfStream);
+    expect(status).toBeInstanceOf(PdfStream);
+
+    if (!(validMark instanceof PdfStream) || !(status instanceof PdfStream)) {
+      throw new Error("Legacy validity resources were not streams");
+    }
+
+    const validMarkContent = new TextDecoder().decode(validMark.getDecodedData());
+
+    expect(validMarkContent).toContain("0.12 0.62 0.29 rg");
+    expect(validMarkContent).toContain("S");
+    expect(new TextDecoder().decode(status.getDecodedData())).toContain(
+      "5349474E454420414E442056414C4944",
+    );
   });
 
   it("validates graphic modes and split ratios", () => {

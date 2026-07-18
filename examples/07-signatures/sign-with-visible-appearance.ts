@@ -52,6 +52,12 @@ async function main() {
       borderColor: rgb(0.16, 0.32, 0.62),
       borderWidth: 1.25,
       padding: 5,
+      // Static OpenPDF-compatible n0-n4 artwork. In a production workflow,
+      // claim "valid" only after your application has independently verified it.
+      legacyLayers: {
+        validity: "valid",
+        statusText: "SIGNED AND VALID",
+      },
     },
   });
 
