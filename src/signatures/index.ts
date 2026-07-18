@@ -57,7 +57,6 @@ export type {
   SignatureAppearanceProvider,
   SignatureAppearanceProviderContext,
   SignatureAppearanceRect,
-  SignatureAppearanceValidity,
   SignatureRenderMode,
   Signer,
   SignOptions,

@@ -8,6 +8,7 @@
  */
 
 import { bytesToHex, toArrayBuffer } from "#src/helpers/buffer.ts";
+import { pemToDer } from "#src/helpers/pem.ts";
 import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
 
@@ -152,13 +153,36 @@ export async function buildCertificateChain(
  * Parse a DER-encoded certificate.
  */
 function parseCertificate(der: Uint8Array): pkijs.Certificate {
-  const asn1 = fromBER(toArrayBuffer(der));
+  const asn1 = fromBER(toArrayBuffer(normalizeCertificateEncoding(der)));
 
   if (asn1.offset === -1) {
     throw new Error("Failed to parse certificate");
   }
 
   return new pkijs.Certificate({ schema: asn1.result });
+}
+
+/** Normalize binary DER, PEM, or a bare Base64 certificate response to DER. */
+function normalizeCertificateEncoding(data: Uint8Array): Uint8Array {
+  if (data[0] === 0x30) {
+    return data;
+  }
+
+  const text = new TextDecoder().decode(data).trim();
+  const base64Body = text
+    .replace(/-----BEGIN CERTIFICATE-----/g, "")
+    .replace(/-----END CERTIFICATE-----/g, "")
+    .replace(/\s/g, "");
+
+  if (
+    base64Body.length > 0 &&
+    base64Body.length % 4 === 0 &&
+    /^[A-Za-z0-9+/]+={0,2}$/.test(base64Body)
+  ) {
+    return pemToDer(text);
+  }
+
+  return data;
 }
 
 /**
@@ -267,7 +291,7 @@ async function fetchCertificate(
 
     const data = await response.arrayBuffer();
 
-    return new Uint8Array(data);
+    return normalizeCertificateEncoding(new Uint8Array(data));
   } catch (error) {
     clearTimeout(timeoutId);
 

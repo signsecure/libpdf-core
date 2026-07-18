@@ -61,31 +61,22 @@ export interface SignatureAppearancePlacement {
 /** Image input accepted by signature appearance options. */
 export type SignatureAppearanceImage = Uint8Array | PDFImage;
 
-/** Static validity artwork rendered into OpenPDF-compatible appearance layers. */
-export type SignatureAppearanceValidity = "unknown" | "valid" | "invalid";
-
 /** Options for the legacy `n0`-`n4` signature appearance layer stack. */
 export interface SignatureAppearanceLegacyLayersOptions {
   /**
-   * Static validity state used for the mark and default status text.
-   * This does not verify the signature or affect a viewer's trust decision.
-   * Defaults to `"unknown"`.
-   */
-  validity?: SignatureAppearanceValidity;
-
-  /**
-   * Replacement `n4` status text. Defaults to a label matching `validity`.
-   * Set this only when the application has independently established the claim.
+   * Replacement `n4` placeholder text. Defaults to `"SIGNATURE NOT VERIFIED"`.
+   * A PDF viewer owns the actual validation state and may render its own status
+   * at runtime; authored appearance content must not claim that state.
    */
   statusText?: string;
 
-  /** Color of the validity mark. Defaults to green, amber, or red by state. */
+  /** Color of the unverified question mark. Defaults to amber. */
   markColor?: Color;
 
-  /** Color of the `n4` status text. Defaults to `markColor`. */
+  /** Color of the `n4` placeholder text. Defaults to `markColor`. */
   statusTextColor?: Color;
 
-  /** Show the validity mark in the status band. Defaults to `true`. */
+  /** Show the unverified question mark in `n1`. Defaults to `true`. */
   showMark?: boolean;
 }
 

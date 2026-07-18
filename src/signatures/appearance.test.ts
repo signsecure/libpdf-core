@@ -84,7 +84,7 @@ describe("SignatureAppearanceGenerator", () => {
     expect(new TextDecoder().decode(stream.getDecodedData())).toContain("/Im0 Do");
   });
 
-  it("builds OpenPDF-compatible n0-n4 layers with a green validity mark", async () => {
+  it("builds OpenPDF-compatible viewer-managed n0-n4 validity layers", async () => {
     const pdf = PDF.create();
     pdf.addPage();
 
@@ -92,10 +92,7 @@ describe("SignatureAppearanceGenerator", () => {
       pdf,
       {
         text: "Signed by Alice Example",
-        legacyLayers: {
-          validity: "valid",
-          statusText: "SIGNED AND VALID",
-        },
+        legacyLayers: true,
       },
       metadata,
     );
@@ -134,32 +131,45 @@ describe("SignatureAppearanceGenerator", () => {
       "n4",
     ]);
 
-    const validMarkRef = layers?.get("n3");
+    const unverifiedMarkRef = layers?.get("n1");
+    const viewerValidityRef = layers?.get("n3");
     const statusRef = layers?.get("n4");
 
-    expect(validMarkRef).toBeInstanceOf(PdfRef);
+    expect(unverifiedMarkRef).toBeInstanceOf(PdfRef);
+    expect(viewerValidityRef).toBeInstanceOf(PdfRef);
     expect(statusRef).toBeInstanceOf(PdfRef);
 
-    if (!(validMarkRef instanceof PdfRef) || !(statusRef instanceof PdfRef)) {
+    if (
+      !(unverifiedMarkRef instanceof PdfRef) ||
+      !(viewerValidityRef instanceof PdfRef) ||
+      !(statusRef instanceof PdfRef)
+    ) {
       throw new Error("Legacy validity resources were not registered");
     }
 
-    const validMark = registry.resolve(validMarkRef);
+    const unverifiedMark = registry.resolve(unverifiedMarkRef);
+    const viewerValidity = registry.resolve(viewerValidityRef);
     const status = registry.resolve(statusRef);
 
-    expect(validMark).toBeInstanceOf(PdfStream);
+    expect(unverifiedMark).toBeInstanceOf(PdfStream);
+    expect(viewerValidity).toBeInstanceOf(PdfStream);
     expect(status).toBeInstanceOf(PdfStream);
 
-    if (!(validMark instanceof PdfStream) || !(status instanceof PdfStream)) {
+    if (
+      !(unverifiedMark instanceof PdfStream) ||
+      !(viewerValidity instanceof PdfStream) ||
+      !(status instanceof PdfStream)
+    ) {
       throw new Error("Legacy validity resources were not streams");
     }
 
-    const validMarkContent = new TextDecoder().decode(validMark.getDecodedData());
+    const unverifiedMarkContent = new TextDecoder().decode(unverifiedMark.getDecodedData());
 
-    expect(validMarkContent).toContain("0.12 0.62 0.29 rg");
-    expect(validMarkContent).toContain("S");
+    expect(unverifiedMarkContent).toContain("0.9 0.62 0.08 rg");
+    expect(unverifiedMarkContent).toContain("<3F> Tj");
+    expect(new TextDecoder().decode(viewerValidity.getDecodedData())).toBe("% DSBlank\n");
     expect(new TextDecoder().decode(status.getDecodedData())).toContain(
-      "5349474E454420414E442056414C4944",
+      "5349474E4154555245204E4F54205645524946494544",
     );
   });
 

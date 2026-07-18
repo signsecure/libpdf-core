@@ -8,12 +8,7 @@
 
 import type { PDF } from "#src/api/pdf";
 import type { Operator } from "#src/content/operators";
-import {
-  drawCircleOps,
-  drawRectangleOps,
-  setFillColor,
-  wrapPathOps,
-} from "#src/drawing/operations";
+import { drawCircleOps, drawRectangleOps, setFillColor } from "#src/drawing/operations";
 import { serializeOperators } from "#src/drawing/serialize";
 import { layoutText } from "#src/drawing/text-layout";
 import type { FontInput } from "#src/drawing/types";
@@ -31,8 +26,6 @@ import {
   concatMatrix,
   endPath,
   endText,
-  lineTo,
-  moveTo,
   paintXObject,
   popGraphicsState,
   pushGraphicsState,
@@ -88,12 +81,9 @@ interface ResolvedAssets {
 }
 
 const DEFAULT_FONT: Standard14FontName = "Helvetica";
-const VALID_COLOR = rgb(0.12, 0.62, 0.29);
 const UNKNOWN_COLOR = rgb(0.9, 0.62, 0.08);
-const INVALID_COLOR = rgb(0.78, 0.16, 0.16);
 
 interface ResolvedLegacyLayersOptions {
-  validity: "unknown" | "valid" | "invalid";
   statusText: string;
   markColor: Color;
   statusTextColor: Color;
@@ -282,14 +272,12 @@ export class SignatureAppearanceGenerator {
   ): PdfStream {
     const registry = this.pdf.context.registry;
     const n0 = createBlankLayer(context);
-    const n1 =
-      options.validity === "unknown" && options.showMark
-        ? this.createValidityLayer(context, options)
-        : createBlankLayer(context);
-    const n3 =
-      options.validity !== "unknown" && options.showMark
-        ? this.createValidityLayer(context, options)
-        : createBlankLayer(context);
+    const n1 = options.showMark
+      ? this.createUnverifiedLayer(context, options)
+      : createBlankLayer(context);
+    // OpenPDF leaves n3 blank. The PDF viewer, not the document author,
+    // calculates validity and may draw a status icon at runtime.
+    const n3 = createBlankLayer(context);
     const n4 = this.createStatusLayer(context, options);
     const layerResources = new PdfDict();
 
@@ -326,8 +314,8 @@ export class SignatureAppearanceGenerator {
     return normalizeAppearanceStream(appearance, context);
   }
 
-  /** Create the n1/n3 validity mark inside the top status band. */
-  private createValidityLayer(
+  /** Create the historical unverified question mark in n1. */
+  private createUnverifiedLayer(
     context: SignatureAppearanceRenderContext,
     options: ResolvedLegacyLayersOptions,
   ): PdfStream {
@@ -354,62 +342,26 @@ export class SignatureAppearanceGenerator {
         }),
       );
 
-      if (options.validity === "valid") {
-        ops.push(
-          ...wrapPathOps(
-            [
-              moveTo(centerX - radius * 0.5, centerY),
-              lineTo(centerX - radius * 0.1, centerY - radius * 0.38),
-              lineTo(centerX + radius * 0.58, centerY + radius * 0.45),
-            ],
-            {
-              strokeColor: white,
-              strokeWidth: Math.max(1, radius * 0.22),
-              lineCap: "round",
-              lineJoin: "round",
-            },
-          ),
-        );
-      } else if (options.validity === "invalid") {
-        ops.push(
-          ...wrapPathOps(
-            [
-              moveTo(centerX - radius * 0.42, centerY - radius * 0.42),
-              lineTo(centerX + radius * 0.42, centerY + radius * 0.42),
-              moveTo(centerX - radius * 0.42, centerY + radius * 0.42),
-              lineTo(centerX + radius * 0.42, centerY - radius * 0.42),
-            ],
-            {
-              strokeColor: white,
-              strokeWidth: Math.max(1, radius * 0.2),
-              lineCap: "round",
-            },
-          ),
-        );
-      } else {
-        this.drawText(
-          ops,
-          "?",
-          {
-            x: centerX - radius,
-            y: centerY - radius,
-            width: diameter,
-            height: diameter,
-          },
-          this.options.font ?? DEFAULT_FONT,
-          white,
-          "center",
-        );
-      }
+      this.drawText(
+        ops,
+        "?",
+        {
+          x: centerX - radius,
+          y: centerY - radius,
+          width: diameter,
+          height: diameter,
+        },
+        this.options.font ?? DEFAULT_FONT,
+        white,
+        "center",
+      );
     }
 
     ops.push(popGraphicsState());
 
     const stream = new PdfStream([], serializeOperators(ops));
 
-    if (options.validity === "unknown") {
-      stream.set("Resources", buildResources(this.options.font ?? DEFAULT_FONT, {}));
-    }
+    stream.set("Resources", buildResources(this.options.font ?? DEFAULT_FONT, {}));
 
     return normalizeAppearanceStream(stream, context);
   }
@@ -524,21 +476,11 @@ function resolveLegacyLayersOptions(
   }
 
   const options: SignatureAppearanceLegacyLayersOptions = value === true ? {} : value;
-  const validity = options.validity ?? "unknown";
-  const defaultColor =
-    validity === "valid" ? VALID_COLOR : validity === "invalid" ? INVALID_COLOR : UNKNOWN_COLOR;
-  const defaultStatus =
-    validity === "valid"
-      ? "SIGNED AND VALID"
-      : validity === "invalid"
-        ? "SIGNATURE INVALID"
-        : "SIGNATURE NOT VERIFIED";
 
   return {
-    validity,
-    statusText: options.statusText ?? defaultStatus,
-    markColor: options.markColor ?? defaultColor,
-    statusTextColor: options.statusTextColor ?? options.markColor ?? defaultColor,
+    statusText: options.statusText ?? "SIGNATURE NOT VERIFIED",
+    markColor: options.markColor ?? UNKNOWN_COLOR,
+    statusTextColor: options.statusTextColor ?? options.markColor ?? UNKNOWN_COLOR,
     showMark: options.showMark ?? true,
   };
 }

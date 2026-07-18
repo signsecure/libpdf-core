@@ -159,10 +159,7 @@ describe("signing integration", () => {
               rect: { x: 20, y: 20, width: 170, height: 60 },
             },
           ],
-          legacyLayers: {
-            validity: "valid",
-            statusText: "SIGNED AND VALID",
-          },
+          legacyLayers: true,
         },
       });
 

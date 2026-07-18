@@ -253,8 +253,8 @@ field without an `appearance` remains an invisible signature, matching the previ
 ### OpenPDF-Compatible n0-n4 Layers
 
 Set `legacyLayers: true` to wrap the normal appearance in the historical `FRM` and `n0` through
-`n4` Form XObject structure. The safe default renders an unknown mark and `SIGNATURE NOT VERIFIED`
-in the `n4` status layer:
+`n4` Form XObject structure. It renders an unverified placeholder in `n1`, leaves `n3` blank for
+viewer-managed validity, and writes `SIGNATURE NOT VERIFIED` in `n4`:
 
 ```ts
 await pdf.sign({
@@ -271,23 +271,12 @@ await pdf.sign({
 });
 ```
 
-An application that has independently verified the claim can render the green check and signed-valid
-text:
+Use `markColor`, `statusTextColor`, or `showMark` to customize the unverified placeholder artwork.
 
-```ts
-legacyLayers: {
-  validity: "valid",
-  statusText: "SIGNED AND VALID",
-}
-```
-
-The other static state is `invalid`. Use `markColor`, `statusTextColor`, or `showMark` to customize
-the status artwork.
-
-<Callout type="warn" title="Visual status is not verification">
-  The n1/n3 mark and n4 text are static appearance content. They do not verify the cryptographic
-  signature, establish certificate trust, or control the validity indicator shown by Adobe Acrobat
-  or another PDF viewer.
+<Callout type="warn" title="Validity belongs to the viewer">
+  A green check or other validated status is calculated by the PDF viewer from document integrity,
+  certificate trust, time, and revocation information. The library intentionally does not author a
+  static valid state because appearance content cannot establish signature validity.
 </Callout>
 
 ## Signature Fields
