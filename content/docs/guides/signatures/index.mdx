@@ -254,7 +254,7 @@ field without an `appearance` remains an invisible signature, matching the previ
 
 Set `legacyLayers: true` to wrap the normal appearance in the historical `FRM` and `n0` through
 `n4` Form XObject structure. It renders an unverified placeholder in `n1`, leaves `n3` blank for
-viewer-managed validity, and writes `SIGNATURE NOT VERIFIED` in `n4`:
+viewer-managed validity, and writes `Signature Not Verified` in `n4`:
 
 ```ts
 await pdf.sign({
@@ -271,7 +271,8 @@ await pdf.sign({
 });
 ```
 
-Use `markColor`, `statusTextColor`, or `showMark` to customize the unverified placeholder artwork.
+Use `statusText` or `statusTextColor` to customize the `n4` placeholder. The `n1` `DSUnknown`
+template intentionally matches OpenPDF's legacy stream.
 
 <Callout type="warn" title="Validity belongs to the viewer">
   A green check or other validated status is calculated by the PDF viewer from document integrity,

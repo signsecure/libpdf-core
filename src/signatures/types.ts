@@ -64,20 +64,14 @@ export type SignatureAppearanceImage = Uint8Array | PDFImage;
 /** Options for the legacy `n0`-`n4` signature appearance layer stack. */
 export interface SignatureAppearanceLegacyLayersOptions {
   /**
-   * Replacement `n4` placeholder text. Defaults to `"SIGNATURE NOT VERIFIED"`.
+   * Replacement `n4` placeholder text. Defaults to `"Signature Not Verified"`.
    * A PDF viewer owns the actual validation state and may render its own status
    * at runtime; authored appearance content must not claim that state.
    */
   statusText?: string;
 
-  /** Color of the unverified question mark. Defaults to amber. */
-  markColor?: Color;
-
-  /** Color of the `n4` placeholder text. Defaults to `markColor`. */
+  /** Color of the `n4` placeholder text. Defaults to black. */
   statusTextColor?: Color;
-
-  /** Show the unverified question mark in `n1`. Defaults to `true`. */
-  showMark?: boolean;
 }
 
 /** Metadata supplied to a custom signature appearance provider. */

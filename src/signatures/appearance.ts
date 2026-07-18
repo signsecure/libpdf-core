@@ -8,7 +8,7 @@
 
 import type { PDF } from "#src/api/pdf";
 import type { Operator } from "#src/content/operators";
-import { drawCircleOps, drawRectangleOps, setFillColor } from "#src/drawing/operations";
+import { drawRectangleOps, setFillColor } from "#src/drawing/operations";
 import { serializeOperators } from "#src/drawing/serialize";
 import { layoutText } from "#src/drawing/text-layout";
 import type { FontInput } from "#src/drawing/types";
@@ -19,7 +19,7 @@ import {
   isWinAnsiStandard14,
   type Standard14FontName,
 } from "#src/fonts/standard-14";
-import { black, rgb, white, type Color } from "#src/helpers/colors";
+import { black, type Color } from "#src/helpers/colors";
 import {
   beginText,
   clip,
@@ -81,13 +81,55 @@ interface ResolvedAssets {
 }
 
 const DEFAULT_FONT: Standard14FontName = "Helvetica";
-const UNKNOWN_COLOR = rgb(0.9, 0.62, 0.08);
+const LEGACY_LAYER_SIZE = 100;
+const LEGACY_TOP_SECTION = 0.3;
+const LEGACY_UNKNOWN_APPEARANCE = `% DSUnknown
+q
+1 G
+1 g
+0.1 0 0 0.1 9 0 cm
+0 J 0 j 4 M []0 d
+1 i${" "}
+0 g
+313 292 m
+313 404 325 453 432 529 c
+478 561 504 597 504 645 c
+504 736 440 760 391 760 c
+286 760 271 681 265 626 c
+265 625 l
+100 625 l
+100 828 253 898 381 898 c
+451 898 679 878 679 650 c
+679 555 628 499 538 435 c
+488 399 467 376 467 292 c
+313 292 l
+h
+308 214 170 -164 re
+f
+0.44 G
+1.2 w
+1 1 0.4 rg
+287 318 m
+287 430 299 479 406 555 c
+451 587 478 623 478 671 c
+478 762 414 786 365 786 c
+260 786 245 707 239 652 c
+239 651 l
+74 651 l
+74 854 227 924 355 924 c
+425 924 653 904 653 676 c
+653 581 602 525 512 461 c
+462 425 441 402 441 318 c
+287 318 l
+h
+282 240 170 -164 re
+B
+Q
+`;
 
 interface ResolvedLegacyLayersOptions {
   statusText: string;
-  markColor: Color;
   statusTextColor: Color;
-  showMark: boolean;
 }
 
 /** Generate built-in or provider-based visible signature appearances. */
@@ -271,15 +313,15 @@ export class SignatureAppearanceGenerator {
     options: ResolvedLegacyLayersOptions,
   ): PdfStream {
     const registry = this.pdf.context.registry;
-    const n0 = createBlankLayer(context);
-    const n1 = options.showMark
-      ? this.createUnverifiedLayer(context, options)
-      : createBlankLayer(context);
+    const n0 = createLegacyLayer("% DSBlank\n", [0, 0, 100, 100]);
+    const n1 = createLegacyLayer(LEGACY_UNKNOWN_APPEARANCE, [0, 0, 100, 100]);
     // OpenPDF leaves n3 blank. The PDF viewer, not the document author,
     // calculates validity and may draw a status icon at runtime.
-    const n3 = createBlankLayer(context);
+    const n3 = createLegacyLayer("% DSBlank\n", [0, 0, 100, 100]);
     const n4 = this.createStatusLayer(context, options);
     const layerResources = new PdfDict();
+
+    setLegacyFormGeometry(mainAppearance, [0, 0, context.width, context.height]);
 
     layerResources.set("n0", registry.register(n0));
     layerResources.set("n1", registry.register(n1));
@@ -287,83 +329,35 @@ export class SignatureAppearanceGenerator {
     layerResources.set("n3", registry.register(n3));
     layerResources.set("n4", registry.register(n4));
 
+    const scaledSize = Math.min(context.width, context.height) * 0.9;
+    // OpenPDF's content writer serializes this transform with two decimals.
+    const validityScale = Math.round((scaledSize / LEGACY_LAYER_SIZE) * 100) / 100;
+    const validityX = (context.width - scaledSize) / 2;
+    const validityY = (context.height - scaledSize) / 2;
     const form = new PdfStream(
       [],
       serializeOperators([
-        pushGraphicsState(),
-        paintXObject("n0"),
-        paintXObject("n1"),
-        paintXObject("n2"),
-        paintXObject("n3"),
-        paintXObject("n4"),
-        popGraphicsState(),
+        ...paintLegacyLayer("n0", 1, 0, 0, 1, 0, 0),
+        ...paintLegacyLayer("n1", validityScale, 0, 0, validityScale, validityX, validityY),
+        ...paintLegacyLayer("n2", 1, 0, 0, 1, 0, 0),
+        ...paintLegacyLayer("n3", validityScale, 0, 0, validityScale, validityX, validityY),
+        ...paintLegacyLayer("n4", 1, 0, 0, 1, 0, 0),
       ]),
     );
 
     form.set("Resources", PdfDict.of({ XObject: layerResources }));
-    normalizeAppearanceStream(form, context);
+    setLegacyFormGeometry(form, [0, 0, context.width, context.height]);
 
     const formRef = registry.register(form);
     const appearance = new PdfStream(
       [],
-      serializeOperators([pushGraphicsState(), paintXObject("FRM"), popGraphicsState()]),
+      serializeOperators(paintLegacyLayer("FRM", 1, 0, 0, 1, 0, 0)),
     );
 
     appearance.set("Resources", PdfDict.of({ XObject: PdfDict.of({ FRM: formRef }) }));
+    setLegacyFormGeometry(appearance, [0, 0, context.width, context.height]);
 
-    return normalizeAppearanceStream(appearance, context);
-  }
-
-  /** Create the historical unverified question mark in n1. */
-  private createUnverifiedLayer(
-    context: SignatureAppearanceRenderContext,
-    options: ResolvedLegacyLayersOptions,
-  ): PdfStream {
-    const { width, height } = context;
-    const padding = this.options.padding ?? 2;
-    const diameter = validityMarkDiameter(width, height, padding);
-    const radius = diameter / 2;
-    const centerX = padding + radius;
-    const centerY = height - height * 0.15;
-    const ops: Operator[] = [
-      pushGraphicsState(),
-      rectangle(0, 0, width, height),
-      clip(),
-      endPath(),
-    ];
-
-    if (diameter > 0) {
-      ops.push(
-        ...drawCircleOps({
-          cx: centerX,
-          cy: centerY,
-          radius,
-          fillColor: options.markColor,
-        }),
-      );
-
-      this.drawText(
-        ops,
-        "?",
-        {
-          x: centerX - radius,
-          y: centerY - radius,
-          width: diameter,
-          height: diameter,
-        },
-        this.options.font ?? DEFAULT_FONT,
-        white,
-        "center",
-      );
-    }
-
-    ops.push(popGraphicsState());
-
-    const stream = new PdfStream([], serializeOperators(ops));
-
-    stream.set("Resources", buildResources(this.options.font ?? DEFAULT_FONT, {}));
-
-    return normalizeAppearanceStream(stream, context);
+    return appearance;
   }
 
   /** Create the n4 validity status text. */
@@ -373,17 +367,17 @@ export class SignatureAppearanceGenerator {
   ): PdfStream {
     const { width, height } = context;
     const padding = this.options.padding ?? 2;
-    const markWidth = options.showMark ? validityMarkDiameter(width, height, padding) + padding : 0;
+    const statusBottom = height - height * LEGACY_TOP_SECTION;
     const ops: Operator[] = [];
 
     this.drawText(
       ops,
       options.statusText,
       {
-        x: padding + markWidth,
-        y: height * 0.7 + padding,
-        width: Math.max(0, width - padding * 2 - markWidth),
-        height: Math.max(0, height * 0.3 - padding * 2),
+        x: padding,
+        y: statusBottom + padding,
+        width: Math.max(0, width - padding * 2),
+        height: Math.max(0, height * LEGACY_TOP_SECTION - padding * 2),
       },
       this.options.font ?? DEFAULT_FONT,
       options.statusTextColor,
@@ -393,8 +387,9 @@ export class SignatureAppearanceGenerator {
     const stream = new PdfStream([], serializeOperators(ops));
 
     stream.set("Resources", buildResources(this.options.font ?? DEFAULT_FONT, {}));
+    setLegacyFormGeometry(stream, [0, statusBottom, width, height]);
 
-    return normalizeAppearanceStream(stream, context);
+    return stream;
   }
 
   private drawText(
@@ -478,22 +473,46 @@ function resolveLegacyLayersOptions(
   const options: SignatureAppearanceLegacyLayersOptions = value === true ? {} : value;
 
   return {
-    statusText: options.statusText ?? "SIGNATURE NOT VERIFIED",
-    markColor: options.markColor ?? UNKNOWN_COLOR,
-    statusTextColor: options.statusTextColor ?? options.markColor ?? UNKNOWN_COLOR,
-    showMark: options.showMark ?? true,
+    statusText: options.statusText ?? "Signature Not Verified",
+    statusTextColor: options.statusTextColor ?? black,
   };
 }
 
-function createBlankLayer(context: SignatureAppearanceRenderContext): PdfStream {
-  return normalizeAppearanceStream(
-    new PdfStream([], new TextEncoder().encode("% DSBlank\n")),
-    context,
-  );
+function createLegacyLayer(content: string, bbox: [number, number, number, number]): PdfStream {
+  const stream = new PdfStream([], new TextEncoder().encode(content));
+
+  setLegacyFormGeometry(stream, bbox);
+
+  return stream;
 }
 
-function validityMarkDiameter(width: number, height: number, padding: number): number {
-  return Math.max(0, Math.min(height * 0.3 - padding * 2, width * 0.16));
+function setLegacyFormGeometry(stream: PdfStream, bbox: [number, number, number, number]): void {
+  stream.set("Type", PdfName.of("XObject"));
+  stream.set("Subtype", PdfName.of("Form"));
+  stream.set("FormType", PdfNumber.of(1));
+  stream.set("BBox", new PdfArray(bbox.map(value => PdfNumber.of(value))));
+  stream.set("Matrix", new PdfArray([1, 0, 0, 1, 0, 0].map(value => PdfNumber.of(value))));
+
+  if (!stream.has("Resources")) {
+    stream.set("Resources", new PdfDict());
+  }
+}
+
+function paintLegacyLayer(
+  name: string,
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  e: number,
+  f: number,
+): Operator[] {
+  return [
+    pushGraphicsState(),
+    concatMatrix(a, b, c, d, e, f),
+    paintXObject(name),
+    popGraphicsState(),
+  ];
 }
 
 function validateOptions(options: SignatureAppearanceOptions): void {

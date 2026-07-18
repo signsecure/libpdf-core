@@ -84,7 +84,7 @@ describe("SignatureAppearanceGenerator", () => {
     expect(new TextDecoder().decode(stream.getDecodedData())).toContain("/Im0 Do");
   });
 
-  it("builds OpenPDF-compatible viewer-managed n0-n4 validity layers", async () => {
+  it("matches OpenPDF legacy n0-n4 template geometry and FRM transforms", async () => {
     const pdf = PDF.create();
     pdf.addPage();
 
@@ -106,7 +106,10 @@ describe("SignatureAppearanceGenerator", () => {
     const registry = pdf.context.registry;
     const formRef = stream.getDict("Resources")?.getDict("XObject")?.get("FRM");
 
-    expect(new TextDecoder().decode(stream.getDecodedData())).toContain("/FRM Do");
+    const normalAppearanceContent = new TextDecoder().decode(stream.getDecodedData());
+
+    expect(normalAppearanceContent).toContain("1 0 0 1 0 0 cm");
+    expect(normalAppearanceContent).toContain("/FRM Do");
     expect(formRef).toBeInstanceOf(PdfRef);
 
     if (!(formRef instanceof PdfRef)) {
@@ -131,32 +134,44 @@ describe("SignatureAppearanceGenerator", () => {
       "n4",
     ]);
 
+    const backgroundRef = layers?.get("n0");
     const unverifiedMarkRef = layers?.get("n1");
+    const mainAppearanceRef = layers?.get("n2");
     const viewerValidityRef = layers?.get("n3");
     const statusRef = layers?.get("n4");
 
+    expect(backgroundRef).toBeInstanceOf(PdfRef);
     expect(unverifiedMarkRef).toBeInstanceOf(PdfRef);
+    expect(mainAppearanceRef).toBeInstanceOf(PdfRef);
     expect(viewerValidityRef).toBeInstanceOf(PdfRef);
     expect(statusRef).toBeInstanceOf(PdfRef);
 
     if (
+      !(backgroundRef instanceof PdfRef) ||
       !(unverifiedMarkRef instanceof PdfRef) ||
+      !(mainAppearanceRef instanceof PdfRef) ||
       !(viewerValidityRef instanceof PdfRef) ||
       !(statusRef instanceof PdfRef)
     ) {
       throw new Error("Legacy validity resources were not registered");
     }
 
+    const background = registry.resolve(backgroundRef);
     const unverifiedMark = registry.resolve(unverifiedMarkRef);
+    const mainAppearance = registry.resolve(mainAppearanceRef);
     const viewerValidity = registry.resolve(viewerValidityRef);
     const status = registry.resolve(statusRef);
 
+    expect(background).toBeInstanceOf(PdfStream);
     expect(unverifiedMark).toBeInstanceOf(PdfStream);
+    expect(mainAppearance).toBeInstanceOf(PdfStream);
     expect(viewerValidity).toBeInstanceOf(PdfStream);
     expect(status).toBeInstanceOf(PdfStream);
 
     if (
+      !(background instanceof PdfStream) ||
       !(unverifiedMark instanceof PdfStream) ||
+      !(mainAppearance instanceof PdfStream) ||
       !(viewerValidity instanceof PdfStream) ||
       !(status instanceof PdfStream)
     ) {
@@ -164,12 +179,26 @@ describe("SignatureAppearanceGenerator", () => {
     }
 
     const unverifiedMarkContent = new TextDecoder().decode(unverifiedMark.getDecodedData());
+    const formContent = new TextDecoder().decode(form.getDecodedData());
+    const numberValues = (stream: PdfStream, key: string) =>
+      stream
+        .getArray(key)
+        ?.toArray()
+        .map(value => (value instanceof PdfNumber ? value.value : null));
 
-    expect(unverifiedMarkContent).toContain("0.9 0.62 0.08 rg");
-    expect(unverifiedMarkContent).toContain("<3F> Tj");
+    expect(numberValues(background, "BBox")).toEqual([0, 0, 100, 100]);
+    expect(numberValues(unverifiedMark, "BBox")).toEqual([0, 0, 100, 100]);
+    expect(numberValues(mainAppearance, "BBox")).toEqual([0, 0, 300, 90]);
+    expect(numberValues(viewerValidity, "BBox")).toEqual([0, 0, 100, 100]);
+    expect(numberValues(status, "BBox")).toEqual([0, 63, 300, 90]);
+    expect(numberValues(form, "Matrix")).toEqual([1, 0, 0, 1, 0, 0]);
+    expect(numberValues(unverifiedMark, "Matrix")).toEqual([1, 0, 0, 1, 0, 0]);
+    expect(formContent).toContain("0.81 0 0 0.81 109.5 4.5 cm");
+    expect(unverifiedMarkContent.startsWith("% DSUnknown\n")).toBe(true);
+    expect(unverifiedMarkContent).toContain("313 404 325 453 432 529 c");
     expect(new TextDecoder().decode(viewerValidity.getDecodedData())).toBe("% DSBlank\n");
     expect(new TextDecoder().decode(status.getDecodedData())).toContain(
-      "5349474E4154555245204E4F54205645524946494544",
+      "5369676E6174757265204E6F74205665726966696564",
     );
   });
 
