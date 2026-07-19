@@ -1,7 +1,7 @@
 {
-  "name": "@libpdf/core",
-  "version": "0.4.1",
-  "description": "A modern PDF library for TypeScript - parsing and generation",
+  "name": "@signsecure/libpdf-core",
+  "version": "0.4.1-signsecure.1",
+  "description": "SignSecure's OpenPDF-compatible fork of the modern LibPDF TypeScript library",
   "keywords": [
     "digital-signature",
     "document",
@@ -13,15 +13,15 @@
     "signing",
     "typescript"
   ],
-  "homepage": "https://libpdf.dev",
+  "homepage": "https://github.com/signsecure/libpdf-core",
   "bugs": {
-    "url": "https://github.com/LibPDF-js/core/issues"
+    "url": "https://github.com/signsecure/libpdf-core/issues"
   },
   "license": "MIT",
   "author": "Lucas Smith",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/LibPDF-js/core.git"
+    "url": "git+https://github.com/signsecure/libpdf-core.git"
   },
   "files": [
     "dist",
@@ -43,6 +43,9 @@
       "default": "./dist/index.mjs"
     },
     "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "bench": "vitest bench",
