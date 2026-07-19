@@ -20,6 +20,11 @@ import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
+import {
+  extractCertificateCommonName,
+  SignatureAppearanceGenerator,
+  type SignatureAppearanceMetadata,
+} from "#src/signatures/appearance";
 import { CAdESDetachedBuilder } from "#src/signatures/formats/cades-detached";
 import { PKCS7DetachedBuilder } from "#src/signatures/formats/pkcs7-detached";
 import type { CMSFormatBuilder } from "#src/signatures/formats/types";
@@ -41,6 +46,9 @@ import {
   type DigestAlgorithm,
   type PAdESLevel,
   type RevocationProvider,
+  type SignatureAppearanceOptions,
+  type SignatureAppearancePlacement,
+  type SignatureAppearanceRect,
   SignatureError,
   type SignOptions,
   type SignResult,
@@ -55,6 +63,14 @@ import {
 import { escapePdfString, hashData } from "#src/signatures/utils";
 
 import type { PDF } from "./pdf";
+
+function refsEqual(left: PdfRef, right: PdfRef): boolean {
+  return left.objectNumber === right.objectNumber && left.generation === right.generation;
+}
+
+function refKey(ref: PdfRef): string {
+  return `${ref.objectNumber} ${ref.generation}`;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper functions (moved from sign.ts)
@@ -73,6 +89,7 @@ interface ResolvedSignOptions {
   location?: string;
   contactInfo?: string;
   fieldName?: string;
+  appearance?: SignatureAppearanceOptions;
   timestampAuthority?: SignOptions["timestampAuthority"];
   longTermValidation: boolean;
   revocationProvider?: RevocationProvider;
@@ -170,12 +187,21 @@ export class PDFSignature {
     const signatureRef = this.pdf.context.registry.register(signatureDict);
 
     // Find or create signature field
-    this.prepareSignatureField({
+    const signatureField = this.prepareSignatureField({
       fieldName: resolved.fieldName,
-      pageRef: firstPageRef,
       valueRef: signatureRef,
       namePrefix: "Signature_",
       reuseFirstEmpty: true,
+    });
+
+    await this.configureSignatureField(signatureField, firstPageRef, resolved.appearance, {
+      signerName:
+        resolved.appearance?.signerName ??
+        extractCertificateCommonName(resolved.signer.certificate),
+      signingTime: resolved.signingTime,
+      reason: resolved.reason,
+      location: resolved.location,
+      contactInfo: resolved.contactInfo,
     });
 
     // Save incrementally to get bytes with placeholders
@@ -288,8 +314,8 @@ export class PDFSignature {
 
   /**
    * Find or create the /FT /Sig field that will hold a signature or document
-   * timestamp value, then convert it to the merged field+widget model
-   * (the invisible widget pattern used for all signatures in this library).
+   * timestamp value. Widget configuration happens separately so existing
+   * visible fields can be preserved or replaced intentionally.
    *
    * Lookup behavior:
    * - `fieldName` provided + matches an unsigned signature field -> reuse
@@ -303,12 +329,11 @@ export class PDFSignature {
    */
   private prepareSignatureField(options: {
     fieldName?: string;
-    pageRef: PdfRef;
     valueRef: PdfRef;
     namePrefix: string;
     reuseFirstEmpty: boolean;
-  }): void {
-    const { fieldName, pageRef, valueRef, namePrefix, reuseFirstEmpty } = options;
+  }): SignatureField {
+    const { fieldName, valueRef, namePrefix, reuseFirstEmpty } = options;
 
     const form = this.pdf.getOrCreateForm();
 
@@ -316,7 +341,7 @@ export class PDFSignature {
     // and generate a unique fallback name when none is supplied.
     const existingNames = new Set<string>();
 
-    let fieldDict: PdfDict | undefined;
+    let signatureField: SignatureField | undefined;
 
     for (const field of form.getFields()) {
       existingNames.add(field.name);
@@ -337,73 +362,227 @@ export class PDFSignature {
           );
         }
 
-        fieldDict = field.getDict(); // Use existing unsigned field
+        signatureField = field;
         break;
       }
 
       // If no name requested, optionally reuse the first empty signature field
       if (!fieldName && reuseFirstEmpty && field instanceof SignatureField && !field.isSigned()) {
-        fieldDict = field.getDict();
+        signatureField = field;
         break;
       }
     }
 
-    if (!fieldDict) {
+    if (!signatureField) {
       // PDFForm handles registry registration, /Fields, and /SigFlags 3.
-      fieldDict = form
-        .createSignatureField(fieldName ?? generateUniqueName(existingNames, namePrefix))
-        .getDict();
+      signatureField = form.createSignatureField(
+        fieldName ?? generateUniqueName(existingNames, namePrefix),
+      );
     }
 
     // Set signature value
-    fieldDict.set("V", valueRef);
+    signatureField.getDict().set("V", valueRef);
 
-    // Convert to merged field+widget model (common for invisible signatures).
-    // If the field carried widget kids (e.g. pre-allocated by an external
-    // tool), detach them from their pages first so no dangling /Annots
-    // references remain after we drop /Kids.
-    this.removeWidgetKidsFromPages(fieldDict);
+    return signatureField;
+  }
+
+  /**
+   * Configure an invisible field, preserve an existing visible field, or
+   * generate visible signature widgets and appearances.
+   */
+  private async configureSignatureField(
+    field: SignatureField,
+    firstPageRef: PdfRef,
+    appearance?: SignatureAppearanceOptions,
+    metadata?: SignatureAppearanceMetadata,
+  ): Promise<void> {
+    const existingWidgets = field.getWidgets();
+
+    if (!appearance) {
+      if (existingWidgets.length > 0) {
+        this.lockWidgets(existingWidgets.map(widget => widget.dict));
+
+        return;
+      }
+
+      this.configureInvisibleWidget(field, firstPageRef);
+
+      return;
+    }
+
+    const appearanceMetadata = metadata ?? {
+      signerName: "Document timestamp",
+      signingTime: new Date(),
+    };
+    const generator = SignatureAppearanceGenerator.create(this.pdf, appearance, appearanceMetadata);
+
+    if (!appearance.placements) {
+      await this.updateExistingWidgetAppearances(field, generator);
+
+      return;
+    }
+
+    const placements = this.resolveAppearancePlacements(appearance.placements);
+
+    this.replaceWidgets(field);
+
+    const fieldRef = field.getRef();
+
+    if (!fieldRef) {
+      throw new SignatureError(
+        "INVALID_APPEARANCE",
+        `Signature field "${field.name}" must be an indirect object`,
+      );
+    }
+
+    const fieldDict = field.getDict();
+    const kids = new PdfArray();
+    fieldDict.set("Kids", kids);
+
+    for (const placement of placements) {
+      const page = this.pdf.getPage(placement.pageIndex);
+
+      if (!page) {
+        throw new SignatureError(
+          "INVALID_APPEARANCE",
+          `Signature appearance page index ${placement.pageIndex} does not exist`,
+        );
+      }
+
+      const { x, y, width, height } = placement.rect;
+      const widgetDict = PdfDict.of({
+        Type: PdfName.of("Annot"),
+        Subtype: PdfName.of("Widget"),
+        Rect: new PdfArray([
+          PdfNumber.of(x),
+          PdfNumber.of(y),
+          PdfNumber.of(x + width),
+          PdfNumber.of(y + height),
+        ]),
+        P: page.ref,
+        Parent: fieldRef,
+        F: PdfNumber.of(132),
+      });
+      const stream = await generator.generate({
+        pageIndex: placement.pageIndex,
+        width,
+        height,
+        rotation: page.rotation,
+      });
+      const streamRef = this.pdf.context.registry.register(stream);
+
+      widgetDict.set("AP", PdfDict.of({ N: streamRef }));
+
+      const widgetRef = this.pdf.context.registry.register(widgetDict);
+
+      kids.push(widgetRef);
+      this.addAnnotationToPage(page.dict, widgetRef);
+    }
+  }
+
+  /** Preserve existing positions while replacing each widget's normal appearance. */
+  private async updateExistingWidgetAppearances(
+    field: SignatureField,
+    generator: SignatureAppearanceGenerator,
+  ): Promise<void> {
+    const widgets = field.getWidgets();
+
+    if (widgets.length === 0) {
+      throw new SignatureError(
+        "INVALID_APPEARANCE",
+        "Signature appearance placements are required when the field has no visible widgets",
+      );
+    }
+
+    for (const widget of widgets) {
+      if (widget.width <= 0 || widget.height <= 0) {
+        throw new SignatureError(
+          "INVALID_APPEARANCE",
+          "Signature appearance placements are required when an existing widget is invisible",
+        );
+      }
+
+      const pageIndex = this.findWidgetPageIndex(widget.ref, widget.dict);
+
+      if (pageIndex < 0) {
+        throw new SignatureError(
+          "INVALID_APPEARANCE",
+          `Could not resolve the page for signature field "${field.name}"`,
+        );
+      }
+
+      const page = this.pdf.getPage(pageIndex);
+
+      if (!page) {
+        throw new SignatureError(
+          "INVALID_APPEARANCE",
+          `Signature appearance page index ${pageIndex} does not exist`,
+        );
+      }
+
+      const stream = await generator.generate({
+        pageIndex,
+        width: widget.width,
+        height: widget.height,
+        rotation: page.rotation,
+      });
+
+      widget.setNormalAppearance(stream);
+      this.lockWidgets([widget.dict]);
+    }
+  }
+
+  /** Convert a field without widgets into the merged invisible widget model. */
+  private configureInvisibleWidget(field: SignatureField, pageRef: PdfRef): void {
+    const fieldDict = field.getDict();
+    const fieldRef = field.getRef();
+
     fieldDict.delete("Kids");
-
-    // Add widget annotation properties
     fieldDict.set("Type", PdfName.of("Annot"));
     fieldDict.set("Subtype", PdfName.of("Widget"));
-    fieldDict.set("F", PdfNumber.of(132)); // Print + Locked (4 + 128)
+    fieldDict.set("F", PdfNumber.of(132));
     fieldDict.set("P", pageRef);
     fieldDict.set(
       "Rect",
       new PdfArray([PdfNumber.of(0), PdfNumber.of(0), PdfNumber.of(0), PdfNumber.of(0)]),
     );
-  }
 
-  /**
-   * Remove a field's widget kids from every page's /Annots array.
-   *
-   * Merging a field with widget kids into a single field+widget object would
-   * otherwise leave those widgets referenced from page /Annots while no
-   * longer being listed in the field's /Kids - an inconsistent structure
-   * that confuses viewers.
-   */
-  private removeWidgetKidsFromPages(fieldDict: PdfDict): void {
-    const registry = this.pdf.context.registry;
-    const resolve = registry.resolve.bind(registry);
-    const kids = fieldDict.getArray("Kids", resolve);
-
-    if (!kids || kids.length === 0) {
+    if (!fieldRef) {
       return;
     }
 
-    const kidKeys = new Set<string>();
+    const page = this.pdf.getPages().find(candidate => refsEqual(candidate.ref, pageRef));
 
-    for (const kid of kids) {
-      if (kid instanceof PdfRef) {
-        kidKeys.add(`${kid.objectNumber} ${kid.generation}`);
+    if (page) {
+      this.addAnnotationToPage(page.dict, fieldRef);
+    }
+  }
+
+  /** Remove old merged/separate widget entries before installing placements. */
+  private replaceWidgets(field: SignatureField): void {
+    const fieldDict = field.getDict();
+    const refs = new Set<string>();
+    const dicts = new Set<PdfDict>();
+
+    for (const widget of field.getWidgets()) {
+      dicts.add(widget.dict);
+
+      if (widget.ref) {
+        refs.add(refKey(widget.ref));
       }
     }
 
-    if (kidKeys.size === 0) {
-      return;
+    if (fieldDict.has("Rect")) {
+      dicts.add(fieldDict);
+      const fieldRef = field.getRef();
+
+      if (fieldRef) {
+        refs.add(refKey(fieldRef));
+      }
     }
+
+    const registry = this.pdf.context.registry;
+    const resolve = registry.resolve.bind(registry);
 
     for (const page of this.pdf.getPages()) {
       const annots = page.dict.getArray("Annots", resolve);
@@ -414,11 +593,147 @@ export class PDFSignature {
 
       for (let i = annots.length - 1; i >= 0; i--) {
         const item = annots.at(i);
+        const resolved = item instanceof PdfRef ? resolve(item) : item;
 
-        if (item instanceof PdfRef && kidKeys.has(`${item.objectNumber} ${item.generation}`)) {
+        if (
+          (item instanceof PdfRef && refs.has(refKey(item))) ||
+          (resolved instanceof PdfDict && dicts.has(resolved))
+        ) {
           annots.remove(i);
         }
       }
+    }
+
+    fieldDict.delete("Type");
+    fieldDict.delete("Subtype");
+    fieldDict.delete("Rect");
+    fieldDict.delete("P");
+    fieldDict.delete("AP");
+    fieldDict.delete("MK");
+    fieldDict.delete("BS");
+    fieldDict.delete("F");
+    fieldDict.delete("Kids");
+  }
+
+  private resolveAppearancePlacements(
+    placements: SignatureAppearancePlacement[],
+  ): Array<{ pageIndex: number; rect: SignatureAppearanceRect }> {
+    if (placements.length === 0) {
+      throw new SignatureError(
+        "INVALID_APPEARANCE",
+        "Signature appearance placements cannot be empty",
+      );
+    }
+
+    const result: Array<{ pageIndex: number; rect: SignatureAppearanceRect }> = [];
+    const pageCount = this.pdf.getPageCount();
+
+    for (const placement of placements) {
+      this.validateAppearanceRect(placement.rect);
+
+      if (placement.pageIndex === "all") {
+        for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+          result.push({ pageIndex, rect: { ...placement.rect } });
+        }
+
+        continue;
+      }
+
+      if (
+        !Number.isInteger(placement.pageIndex) ||
+        placement.pageIndex < 0 ||
+        placement.pageIndex >= pageCount
+      ) {
+        throw new SignatureError(
+          "INVALID_APPEARANCE",
+          `Signature appearance page index ${placement.pageIndex} is outside 0-${pageCount - 1}`,
+        );
+      }
+
+      result.push({ pageIndex: placement.pageIndex, rect: { ...placement.rect } });
+    }
+
+    return result;
+  }
+
+  private validateAppearanceRect(rect: SignatureAppearanceRect): void {
+    for (const [name, value] of Object.entries(rect)) {
+      if (!Number.isFinite(value)) {
+        throw new SignatureError(
+          "INVALID_APPEARANCE",
+          `Signature appearance rectangle ${name} must be finite`,
+        );
+      }
+    }
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      throw new SignatureError(
+        "INVALID_APPEARANCE",
+        "Signature appearance rectangle width and height must be greater than zero",
+      );
+    }
+  }
+
+  private findWidgetPageIndex(widgetRef: PdfRef | null, widgetDict: PdfDict): number {
+    const pageRef = widgetDict.getRef("P");
+
+    if (pageRef) {
+      const index = this.pdf.getPages().findIndex(page => refsEqual(page.ref, pageRef));
+
+      if (index >= 0) {
+        return index;
+      }
+    }
+
+    const registry = this.pdf.context.registry;
+    const resolve = registry.resolve.bind(registry);
+
+    return this.pdf.getPages().findIndex(page => {
+      const annots = page.dict.getArray("Annots", resolve);
+
+      if (!annots) {
+        return false;
+      }
+
+      for (const item of annots) {
+        if (widgetRef && item instanceof PdfRef && refsEqual(item, widgetRef)) {
+          return true;
+        }
+
+        const resolved = item instanceof PdfRef ? resolve(item) : item;
+
+        if (resolved === widgetDict) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+  }
+
+  private addAnnotationToPage(pageDict: PdfDict, annotationRef: PdfRef): void {
+    const resolve = this.pdf.context.registry.resolve.bind(this.pdf.context.registry);
+    let annots = pageDict.getArray("Annots", resolve);
+
+    if (!annots) {
+      annots = new PdfArray();
+      pageDict.set("Annots", annots);
+    }
+
+    for (const item of annots) {
+      if (item instanceof PdfRef && refsEqual(item, annotationRef)) {
+        return;
+      }
+    }
+
+    annots.push(annotationRef);
+  }
+
+  private lockWidgets(widgetDicts: PdfDict[]): void {
+    for (const widgetDict of widgetDicts) {
+      const flags = widgetDict.getNumber("F")?.value ?? 0;
+
+      widgetDict.set("F", PdfNumber.of(flags | 132));
     }
   }
 
@@ -863,13 +1178,14 @@ export class PDFSignature {
     // signature is applied. Unlike signing, we never auto-reuse the first
     // empty signature field when no name is given - users typically reserve
     // those for actual signers, not timestamps.
-    this.prepareSignatureField({
+    const timestampField = this.prepareSignatureField({
       fieldName,
-      pageRef: firstPageRef,
       valueRef: timestampRef,
       namePrefix: "Timestamp_",
       reuseFirstEmpty: false,
     });
+
+    await this.configureSignatureField(timestampField, firstPageRef);
 
     // Save incrementally so the file contains the new dict with placeholders.
     const pdfBytes = await this.pdf.save({ incremental: true });
@@ -996,6 +1312,7 @@ export class PDFSignature {
       location: options.location,
       contactInfo: options.contactInfo,
       fieldName: options.fieldName,
+      appearance: options.appearance,
       timestampAuthority: options.timestampAuthority,
       longTermValidation: options.longTermValidation ?? false,
       revocationProvider: options.revocationProvider,

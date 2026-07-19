@@ -5,6 +5,13 @@
  * ETSI EN 319 142-1 (PAdES)
  */
 
+import type { EmbeddedFont } from "#src/fonts/embedded-font";
+import type { Standard14FontName } from "#src/fonts/standard-14";
+import type { Color } from "#src/helpers/colors";
+import type { PDFImage } from "#src/images/pdf-image";
+import type { PdfDict } from "#src/objects/pdf-dict";
+import type { PdfStream } from "#src/objects/pdf-stream";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Core Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,6 +30,158 @@ export type SubFilter = "adbe.pkcs7.detached" | "ETSI.CAdES.detached";
 
 /** PAdES conformance levels */
 export type PAdESLevel = "B-B" | "B-T" | "B-LT" | "B-LTA";
+
+/** Built-in visible signature layouts. */
+export type SignatureRenderMode =
+  | "description"
+  | "name-and-description"
+  | "graphic-and-description"
+  | "graphic";
+
+/** Rectangle for a visible signature widget, in PDF points. */
+export interface SignatureAppearanceRect {
+  /** Left coordinate in page user space. */
+  x: number;
+  /** Bottom coordinate in page user space. */
+  y: number;
+  /** Width in PDF points. Must be greater than zero. */
+  width: number;
+  /** Height in PDF points. Must be greater than zero. */
+  height: number;
+}
+
+/** Page and rectangle where a visible signature is shown. */
+export interface SignatureAppearancePlacement {
+  /** Zero-based page index, or `"all"` to repeat the widget on every page. */
+  pageIndex: number | "all";
+  /** Widget rectangle in page user space. */
+  rect: SignatureAppearanceRect;
+}
+
+/** Image input accepted by signature appearance options. */
+export type SignatureAppearanceImage = Uint8Array | PDFImage;
+
+/** Options for the legacy `n0`-`n4` signature appearance layer stack. */
+export interface SignatureAppearanceLegacyLayersOptions {
+  /**
+   * Replacement `n4` placeholder text. Defaults to `"Signature Not Verified"`.
+   * A PDF viewer owns the actual validation state and may render its own status
+   * at runtime; authored appearance content must not claim that state.
+   */
+  statusText?: string;
+
+  /** Color of the `n4` placeholder text. Defaults to black. */
+  statusTextColor?: Color;
+}
+
+/** Metadata supplied to a custom signature appearance provider. */
+export interface SignatureAppearanceProviderContext {
+  /** Zero-based page index for the widget being rendered. */
+  pageIndex: number;
+  /** Appearance width in PDF points. */
+  width: number;
+  /** Appearance height in PDF points. */
+  height: number;
+  /** Page rotation in degrees. */
+  rotation: 0 | 90 | 180 | 270;
+  /** Display name resolved from the certificate or `signerName`. */
+  signerName: string;
+  /** Claimed signing time stored in the signature dictionary. */
+  signingTime: Date;
+  /** Optional signing reason. */
+  reason?: string;
+  /** Optional signing location. */
+  location?: string;
+  /** Optional signer contact information. */
+  contactInfo?: string;
+  /**
+   * Create a stream that the library will normalize as a Form XObject.
+   * Resources may contain fonts, images, graphics states, or other objects
+   * referenced by the supplied content stream.
+   */
+  createStream(data: Uint8Array, resources?: PdfDict): PdfStream;
+}
+
+/** Callback for fully custom visible signature appearance streams. */
+export type SignatureAppearanceProvider = (
+  context: SignatureAppearanceProviderContext,
+) => PdfStream | Promise<PdfStream>;
+
+/** Options for generating a visible signature appearance. */
+export interface SignatureAppearanceOptions {
+  /** One or more page placements. Omit only when reusing existing visible widgets. */
+  placements?: SignatureAppearancePlacement[];
+
+  /** Built-in layout. Defaults to `"description"`. */
+  mode?: SignatureRenderMode;
+
+  /** Replacement description text. Defaults to signer, date, reason, and location metadata. */
+  text?: string;
+
+  /** Replacement signer display name. Defaults to the certificate common name. */
+  signerName?: string;
+
+  /** Signature graphic for graphic layouts, as PNG/JPEG bytes or an embedded image. */
+  graphic?: SignatureAppearanceImage;
+
+  /** Background image drawn behind the signature content. */
+  backgroundImage?: SignatureAppearanceImage;
+
+  /** Background image sizing. Defaults to `"contain"`. */
+  backgroundImageFit?: "fill" | "contain" | "cover";
+
+  /**
+   * Portion allocated to the graphic in `graphic-and-description` mode.
+   * Must be greater than 0 and less than 1. Defaults to `0.5`.
+   */
+  graphicRatio?: number;
+
+  /** Standard 14 or document-embedded font. Defaults to Helvetica. */
+  font?: Standard14FontName | EmbeddedFont;
+
+  /** Fixed font size. Use `0` or omit it for automatic fitting. */
+  fontSize?: number;
+
+  /** Minimum automatic font size. Defaults to `1`. */
+  minFontSize?: number;
+
+  /** Maximum automatic font size. Defaults to `12`. */
+  maxFontSize?: number;
+
+  /** Text color. Defaults to black. */
+  textColor?: Color;
+
+  /** Text alignment. Defaults to left. */
+  textAlign?: "left" | "center" | "right";
+
+  /** Appearance background color. */
+  backgroundColor?: Color;
+
+  /** Appearance border color. */
+  borderColor?: Color;
+
+  /** Border width in PDF points. Defaults to `1` when a border color is set. */
+  borderWidth?: number;
+
+  /** Inner padding in PDF points. Defaults to `2`. */
+  padding?: number;
+
+  /** Optional status text shown in a band above the main content. */
+  statusText?: string;
+
+  /**
+   * Build an OpenPDF-compatible `n0`-`n4` appearance stack.
+   * `true` enables the safe `unknown` / `SIGNATURE NOT VERIFIED` state.
+   */
+  legacyLayers?: boolean | SignatureAppearanceLegacyLayersOptions;
+
+  /**
+   * Fully custom main appearance provider. When supplied, built-in layout and
+   * styling options are ignored. `legacyLayers`, when enabled, wraps this
+   * stream as `n2`.
+   */
+  provider?: SignatureAppearanceProvider;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Signer Interface
@@ -189,6 +348,15 @@ export interface SignOptions {
    * - If not provided: find first empty field, or create "Signature_N"
    */
   fieldName?: string;
+
+  /**
+   * Generate a visible signature appearance.
+   *
+   * Multiple placements create child widgets that share the same signature
+   * value. If omitted while signing an existing visible signature field, its
+   * widgets and appearances are preserved.
+   */
+  appearance?: SignatureAppearanceOptions;
 
   // ─── Signature Format ────────────────────────────────────────────────────
 

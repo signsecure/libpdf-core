@@ -233,6 +233,21 @@ const signed = await pdf.sign({
   reason: "I approve this document",
 });
 
+// Visible signature (coordinates use PDF points from the bottom-left)
+const signed = await pdf.sign({
+  signer,
+  reason: "Approved for release",
+  appearance: {
+    placements: [{ pageIndex: 0, rect: { x: 48, y: 72, width: 420, height: 112 } }],
+    mode: "graphic-and-description",
+    graphic: pngBytes,
+    legacyLayers: {
+      validity: "valid", // static artwork; does not perform verification
+      statusText: "SIGNED AND VALID",
+    },
+  },
+});
+
 // With timestamp (B-T level)
 const signed = await pdf.sign({
   signer,

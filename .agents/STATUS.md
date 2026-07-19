@@ -23,6 +23,7 @@ Current implementation status of @libpdf/core features.
 - [x] Page embedding (Form XObjects for overlays/watermarks)
 - [x] Content stream parsing
 - [x] Digital signature creation (PAdES B-B, B-T, B-LT, B-LTA)
+- [x] Visible signature appearances (text/image layouts, existing fields, multi-page widgets)
 - [x] Signature signers (P12/PKCS#12, CryptoKey)
 - [x] Timestamp authority support (RFC 3161)
 - [x] Long-term validation (DSS, OCSP, CRL)

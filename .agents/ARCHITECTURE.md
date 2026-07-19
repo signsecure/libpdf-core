@@ -22,7 +22,7 @@ This document outlines the core architecture of @libpdf/core.
 │    (ObjectRegistry, ObjectCopier, AcroForm, ChangeCollector)     │
 ├──────────────────────────────────────────────────────────────────┤
 │                     Signatures Layer                             │
-│  (Signers, CMS Formats, Timestamp, Revocation, DSS, Placeholder) │
+│ (Signers, CMS, Timestamp, DSS, Appearance, Placeholder)          │
 ├──────────────────────────────────────────────────────────────────┤
 │                       Images Layer                               │
 │            (JPEG embedding, PNG embedding, PDFImage)             │

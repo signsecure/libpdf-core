@@ -178,6 +178,21 @@ describe("AIA Chain Building", () => {
       expect(chain).toHaveLength(1);
     });
 
+    it("accepts a bare Base64 certificate returned by an AIA endpoint", async () => {
+      const leafCert = await loadRealCert("github-0.der");
+      const intermediateCert = await loadRealCert("github-1.der");
+      const base64Certificate = Buffer.from(intermediateCert).toString("base64");
+      const mock = createMockFetch(new Map([[0, new TextEncoder().encode(base64Certificate)]]));
+
+      const chain = await buildCertificateChain(leafCert, {
+        fetch: mock.fetch,
+        maxChainLength: 1,
+      });
+
+      expect(chain).toHaveLength(1);
+      expect(chain[0]).toEqual(intermediateCert);
+    });
+
     it("handles circular references gracefully", async () => {
       const leafCert = await loadRealCert("github-0.der");
 
