@@ -1,15 +1,16 @@
 # LibPDF
 
-[![npm](https://img.shields.io/npm/v/@libpdf/core)](https://www.npmjs.com/package/@libpdf/core)
-[![npm downloads](https://img.shields.io/npm/dm/@libpdf/core)](https://www.npmjs.com/package/@libpdf/core)
-[![CI](https://github.com/LibPDF-js/core/actions/workflows/ci.yml/badge.svg)](https://github.com/LibPDF-js/core/actions/workflows/ci.yml)
-[![GitHub stars](https://img.shields.io/github/stars/libpdf-js/core?style=flat)](https://github.com/LibPDF-js/core)
+[![GitHub package](https://img.shields.io/github/v/release/signsecure/libpdf-core?include_prereleases)](https://github.com/orgs/signsecure/packages/npm/package/libpdf-core)
+[![CI](https://github.com/signsecure/libpdf-core/actions/workflows/ci.yml/badge.svg)](https://github.com/signsecure/libpdf-core/actions/workflows/ci.yml)
+[![Upstream](https://img.shields.io/badge/upstream-LibPDF--js%2Fcore-blue)](https://github.com/LibPDF-js/core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
 A modern PDF library for TypeScript. Parse, modify, and generate PDFs with a clean, intuitive API.
 
 > **Beta Software**: LibPDF is under active development and APIs may change between minor versions, but we use it in production at [Documenso](https://documenso.com) and consider it ready for real-world use.
+
+> **SignSecure fork**: This package adds OpenPDF-compatible visible signature appearances and is maintained against [LibPDF-js/core](https://github.com/LibPDF-js/core). The original MIT license and attribution are retained.
 
 ## Why LibPDF?
 
@@ -44,10 +45,19 @@ We kept adding workarounds. A patch here for a malformed xref table. A hack ther
 
 ## Installation
 
+Configure npm to use GitHub Packages for the SignSecure scope. Set
+`GITHUB_PACKAGES_TOKEN` to a GitHub token with `read:packages` permission:
+
+```ini
+# .npmrc
+@signsecure:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
+```
+
 ```bash
-npm install @libpdf/core
+npm install @signsecure/libpdf-core@0.4.1-signsecure.1
 # or
-bun add @libpdf/core
+bun add @signsecure/libpdf-core@0.4.1-signsecure.1
 ```
 
 ## Quick Start
@@ -55,7 +65,7 @@ bun add @libpdf/core
 ### Parse an existing PDF
 
 ```typescript
-import { PDF } from "@libpdf/core";
+import { PDF } from "@signsecure/libpdf-core";
 
 const pdf = await PDF.load(bytes);
 const pages = pdf.getPages();
@@ -87,7 +97,7 @@ const filled = await pdf.save();
 ### Sign a document
 
 ```typescript
-import { PDF, P12Signer } from "@libpdf/core";
+import { PDF, P12Signer } from "@signsecure/libpdf-core";
 
 const pdf = await PDF.load(bytes);
 const signer = await P12Signer.create(p12Bytes, "password");
@@ -107,7 +117,7 @@ const merged = await PDF.merge([pdf1Bytes, pdf2Bytes, pdf3Bytes]);
 ### Draw on a page
 
 ```typescript
-import { PDF, rgb } from "@libpdf/core";
+import { PDF, rgb } from "@signsecure/libpdf-core";
 
 const pdf = PDF.create();
 const page = pdf.addPage({ size: "letter" });
