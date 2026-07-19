@@ -1,0 +1,98 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Open upstream sync PR
+    if: github.repository == 'signsecure/libpdf-core'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork main
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/LibPDF-js/core.git
+          git fetch upstream main --tags
+
+      - name: Check for updates
+        id: updates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Fork main already contains upstream main."
+            exit 0
+          fi
+
+          OPEN_SYNC_PRS="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("chore/sync-upstream-"))] | length')"
+
+          if [ "$OPEN_SYNC_PRS" -gt 0 ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "An upstream sync PR is already open."
+            exit 0
+          fi
+
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare sync branch
+        id: sync
+        if: steps.updates.outputs.available == 'true'
+        run: |
+          BRANCH="chore/sync-upstream-${GITHUB_RUN_NUMBER}"
+          UPSTREAM_SHA="$(git rev-parse upstream/main)"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git merge --no-edit upstream/main
+
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=$UPSTREAM_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Bun
+        if: steps.updates.outputs.available == 'true'
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        if: steps.updates.outputs.available == 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Validate merged source
+        if: steps.updates.outputs.available == 'true'
+        run: |
+          bun run lint
+          bun run typecheck
+          bun run test:run
+          bun run build
+
+      - name: Push branch and open PR
+        if: steps.updates.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.sync.outputs.branch }}
+          UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
+        run: |
+          git push --set-upstream origin "$BRANCH"
+
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "Sync upstream LibPDF-js/core" \
+            --body "Automated sync of upstream \`LibPDF-js/core@${UPSTREAM_SHA}\`. Review the fork-specific package metadata and signature appearance tests before merging."
