@@ -1,6 +1,6 @@
 # Benchmark Report
 
-> Generated on 2026-08-24 at 07:07:14 UTC
+> Generated on 2026-08-31 at 13:11:00 UTC
 >
 > System: linux | AMD EPYC 7763 64-Core Processor (4 cores) | 16GB RAM | Bun 1.4.0
 
@@ -22,232 +22,232 @@
 
 | Benchmark       | ops/sec |     Mean |      p99 |    RME | Samples |
 | :-------------- | ------: | -------: | -------: | -----: | ------: |
-| libpdf          |    53.3 |  18.76ms |  24.55ms | ±3.55% |      27 |
-| @cantoo/pdf-lib |     4.3 | 231.44ms | 238.64ms | ±1.34% |      10 |
-| pdf-lib         |     4.3 | 233.64ms | 245.71ms | ±2.05% |      10 |
+| libpdf          |    50.2 |  19.90ms |  33.18ms | ±7.77% |      26 |
+| @cantoo/pdf-lib |     4.6 | 215.07ms | 217.87ms | ±0.88% |      10 |
+| pdf-lib         |     4.6 | 218.76ms | 233.54ms | ±2.38% |      10 |
 
-- **libpdf** is 12.34x faster than @cantoo/pdf-lib
-- **libpdf** is 12.45x faster than pdf-lib
+- **libpdf** is 10.81x faster than @cantoo/pdf-lib
+- **libpdf** is 10.99x faster than pdf-lib
 
 ### Create blank PDF
 
 | Benchmark       | ops/sec |  Mean |    p99 |    RME | Samples |
 | :-------------- | ------: | ----: | -----: | -----: | ------: |
-| libpdf          |   12.9K |  77us |  170us | ±2.96% |   6,468 |
-| pdf-lib         |    2.8K | 363us | 1.59ms | ±2.83% |   1,378 |
-| @cantoo/pdf-lib |    2.3K | 431us | 2.27ms | ±5.60% |   1,161 |
+| libpdf          |   13.0K |  77us |  176us | ±2.71% |   6,485 |
+| pdf-lib         |    3.0K | 331us | 1.33ms | ±2.66% |   1,510 |
+| @cantoo/pdf-lib |    2.7K | 365us | 1.68ms | ±2.89% |   1,371 |
 
-- **libpdf** is 4.69x faster than pdf-lib
-- **libpdf** is 5.57x faster than @cantoo/pdf-lib
+- **libpdf** is 4.30x faster than pdf-lib
+- **libpdf** is 4.73x faster than @cantoo/pdf-lib
 
 ### Add 10 pages
 
 | Benchmark       | ops/sec |  Mean |    p99 |    RME | Samples |
 | :-------------- | ------: | ----: | -----: | -----: | ------: |
-| libpdf          |    7.8K | 129us |  268us | ±1.41% |   3,878 |
-| @cantoo/pdf-lib |    2.2K | 451us | 2.54ms | ±4.81% |   1,108 |
-| pdf-lib         |    2.0K | 490us | 2.21ms | ±3.99% |   1,020 |
+| libpdf          |    8.2K | 122us |  238us | ±1.09% |   4,109 |
+| @cantoo/pdf-lib |    2.4K | 408us | 1.96ms | ±3.19% |   1,225 |
+| pdf-lib         |    2.2K | 450us | 1.85ms | ±4.08% |   1,111 |
 
-- **libpdf** is 3.50x faster than @cantoo/pdf-lib
-- **libpdf** is 3.80x faster than pdf-lib
+- **libpdf** is 3.35x faster than @cantoo/pdf-lib
+- **libpdf** is 3.70x faster than pdf-lib
 
 ### Draw 50 rectangles
 
 | Benchmark       | ops/sec |   Mean |    p99 |    RME | Samples |
 | :-------------- | ------: | -----: | -----: | -----: | ------: |
-| libpdf          |    2.7K |  368us | 1.00ms | ±1.83% |   1,360 |
-| pdf-lib         |   660.1 | 1.52ms | 6.38ms | ±7.67% |     333 |
-| @cantoo/pdf-lib |   551.6 | 1.81ms | 6.09ms | ±7.34% |     279 |
+| libpdf          |    2.9K |  350us |  803us | ±1.27% |   1,427 |
+| pdf-lib         |   751.1 | 1.33ms | 4.83ms | ±6.26% |     376 |
+| @cantoo/pdf-lib |   585.5 | 1.71ms | 5.84ms | ±6.99% |     293 |
 
-- **libpdf** is 4.12x faster than pdf-lib
-- **libpdf** is 4.93x faster than @cantoo/pdf-lib
+- **libpdf** is 3.80x faster than pdf-lib
+- **libpdf** is 4.87x faster than @cantoo/pdf-lib
 
 ### Load and save PDF
 
 | Benchmark       | ops/sec |     Mean |      p99 |    RME | Samples |
 | :-------------- | ------: | -------: | -------: | -----: | ------: |
-| libpdf          |    53.1 |  18.84ms |  28.06ms | ±4.58% |      27 |
-| pdf-lib         |     3.1 | 321.10ms | 336.87ms | ±1.62% |      10 |
-| @cantoo/pdf-lib |     1.6 | 615.50ms | 656.29ms | ±2.90% |      10 |
+| libpdf          |    56.2 |  17.79ms |  22.33ms | ±2.26% |      29 |
+| pdf-lib         |     3.2 | 314.84ms | 347.74ms | ±2.82% |      10 |
+| @cantoo/pdf-lib |     1.6 | 606.65ms | 634.61ms | ±1.85% |      10 |
 
-- **libpdf** is 17.05x faster than pdf-lib
-- **libpdf** is 32.67x faster than @cantoo/pdf-lib
+- **libpdf** is 17.70x faster than pdf-lib
+- **libpdf** is 34.10x faster than @cantoo/pdf-lib
 
 ### Load, modify, and save PDF
 
 | Benchmark       | ops/sec |     Mean |      p99 |    RME | Samples |
 | :-------------- | ------: | -------: | -------: | -----: | ------: |
-| pdf-lib         |     3.1 | 318.02ms | 333.96ms | ±1.47% |      10 |
-| libpdf          |     2.8 | 355.97ms | 375.53ms | ±1.82% |      10 |
-| @cantoo/pdf-lib |     1.6 | 613.55ms | 630.58ms | ±1.66% |      10 |
+| pdf-lib         |     3.2 | 308.66ms | 316.88ms | ±1.20% |      10 |
+| libpdf          |     3.0 | 335.77ms | 350.04ms | ±1.50% |      10 |
+| @cantoo/pdf-lib |     1.6 | 640.44ms | 667.99ms | ±1.32% |      10 |
 
-- **pdf-lib** is 1.12x faster than libpdf
-- **pdf-lib** is 1.93x faster than @cantoo/pdf-lib
+- **pdf-lib** is 1.09x faster than libpdf
+- **pdf-lib** is 2.07x faster than @cantoo/pdf-lib
 
 ### Extract single page from 100-page PDF
 
-| Benchmark       | ops/sec |    Mean |     p99 |    RME | Samples |
-| :-------------- | ------: | ------: | ------: | -----: | ------: |
-| libpdf          |   245.3 |  4.08ms |  5.29ms | ±1.28% |     123 |
-| pdf-lib         |   106.1 |  9.43ms | 11.53ms | ±2.21% |      54 |
-| @cantoo/pdf-lib |    99.2 | 10.08ms | 16.82ms | ±3.95% |      50 |
+| Benchmark       | ops/sec |   Mean |     p99 |    RME | Samples |
+| :-------------- | ------: | -----: | ------: | -----: | ------: |
+| libpdf          |   275.1 | 3.64ms |  4.15ms | ±0.77% |     138 |
+| pdf-lib         |   114.8 | 8.71ms | 10.79ms | ±1.50% |      58 |
+| @cantoo/pdf-lib |   105.2 | 9.51ms | 15.17ms | ±3.53% |      53 |
 
-- **libpdf** is 2.31x faster than pdf-lib
-- **libpdf** is 2.47x faster than @cantoo/pdf-lib
+- **libpdf** is 2.40x faster than pdf-lib
+- **libpdf** is 2.62x faster than @cantoo/pdf-lib
 
 ### Split 100-page PDF into single-page PDFs
 
 | Benchmark       | ops/sec |    Mean |     p99 |    RME | Samples |
 | :-------------- | ------: | ------: | ------: | -----: | ------: |
-| libpdf          |    23.7 | 42.13ms | 46.92ms | ±3.02% |      12 |
-| pdf-lib         |    12.9 | 77.81ms | 94.92ms | ±9.73% |       7 |
-| @cantoo/pdf-lib |    12.7 | 78.54ms | 85.44ms | ±4.92% |       7 |
+| libpdf          |    24.4 | 40.96ms | 45.12ms | ±2.93% |      13 |
+| pdf-lib         |    14.3 | 70.17ms | 79.36ms | ±5.51% |       8 |
+| @cantoo/pdf-lib |    13.3 | 75.43ms | 80.43ms | ±4.37% |       7 |
 
-- **libpdf** is 1.85x faster than pdf-lib
-- **libpdf** is 1.86x faster than @cantoo/pdf-lib
+- **libpdf** is 1.71x faster than pdf-lib
+- **libpdf** is 1.84x faster than @cantoo/pdf-lib
 
 ### Split 2000-page PDF into single-page PDFs (0.9MB)
 
 | Benchmark       | ops/sec |     Mean |      p99 |    RME | Samples |
 | :-------------- | ------: | -------: | -------: | -----: | ------: |
-| libpdf          |     1.3 | 779.67ms | 779.67ms | ±0.00% |       1 |
-| pdf-lib         |   0.757 |    1.32s |    1.32s | ±0.00% |       1 |
-| @cantoo/pdf-lib |   0.680 |    1.47s |    1.47s | ±0.00% |       1 |
+| libpdf          |     1.3 | 751.41ms | 751.41ms | ±0.00% |       1 |
+| pdf-lib         |   0.753 |    1.33s |    1.33s | ±0.00% |       1 |
+| @cantoo/pdf-lib |   0.701 |    1.43s |    1.43s | ±0.00% |       1 |
 
-- **libpdf** is 1.69x faster than pdf-lib
-- **libpdf** is 1.88x faster than @cantoo/pdf-lib
+- **libpdf** is 1.77x faster than pdf-lib
+- **libpdf** is 1.90x faster than @cantoo/pdf-lib
 
 ### Copy 10 pages between documents
 
 | Benchmark       | ops/sec |    Mean |     p99 |    RME | Samples |
 | :-------------- | ------: | ------: | ------: | -----: | ------: |
-| libpdf          |   203.3 |  4.92ms |  5.87ms | ±1.18% |     102 |
-| pdf-lib         |    85.4 | 11.71ms | 13.50ms | ±1.64% |      43 |
-| @cantoo/pdf-lib |    76.0 | 13.16ms | 14.58ms | ±1.71% |      38 |
+| libpdf          |   212.3 |  4.71ms |  5.27ms | ±0.73% |     107 |
+| pdf-lib         |    87.1 | 11.48ms | 13.07ms | ±1.51% |      44 |
+| @cantoo/pdf-lib |    77.7 | 12.87ms | 13.86ms | ±1.30% |      39 |
 
-- **libpdf** is 2.38x faster than pdf-lib
-- **libpdf** is 2.68x faster than @cantoo/pdf-lib
+- **libpdf** is 2.44x faster than pdf-lib
+- **libpdf** is 2.73x faster than @cantoo/pdf-lib
 
 ### Merge 2 x 100-page PDFs
 
 | Benchmark       | ops/sec |    Mean |     p99 |    RME | Samples |
 | :-------------- | ------: | ------: | ------: | -----: | ------: |
-| libpdf          |    61.6 | 16.24ms | 17.61ms | ±1.42% |      31 |
-| pdf-lib         |    18.8 | 53.10ms | 53.82ms | ±0.87% |      10 |
-| @cantoo/pdf-lib |    15.7 | 63.86ms | 66.26ms | ±1.58% |       8 |
+| libpdf          |    65.8 | 15.19ms | 17.71ms | ±1.31% |      33 |
+| pdf-lib         |    19.4 | 51.51ms | 53.00ms | ±0.84% |      10 |
+| @cantoo/pdf-lib |    16.2 | 61.59ms | 62.85ms | ±0.80% |       9 |
 
-- **libpdf** is 3.27x faster than pdf-lib
-- **libpdf** is 3.93x faster than @cantoo/pdf-lib
+- **libpdf** is 3.39x faster than pdf-lib
+- **libpdf** is 4.05x faster than @cantoo/pdf-lib
 
 ### Fill FINTRAC form fields
 
 | Benchmark       | ops/sec |    Mean |     p99 |    RME | Samples |
 | :-------------- | ------: | ------: | ------: | -----: | ------: |
-| libpdf          |    45.2 | 22.10ms | 26.53ms | ±3.37% |      23 |
-| @cantoo/pdf-lib |    34.9 | 28.66ms | 39.46ms | ±6.24% |      18 |
-| pdf-lib         |    34.6 | 28.93ms | 40.56ms | ±5.91% |      18 |
+| libpdf          |    48.1 | 20.79ms | 27.66ms | ±4.75% |      25 |
+| @cantoo/pdf-lib |    37.7 | 26.54ms | 34.94ms | ±4.33% |      19 |
+| pdf-lib         |    36.2 | 27.60ms | 45.00ms | ±7.74% |      19 |
 
-- **libpdf** is 1.30x faster than @cantoo/pdf-lib
-- **libpdf** is 1.31x faster than pdf-lib
+- **libpdf** is 1.28x faster than @cantoo/pdf-lib
+- **libpdf** is 1.33x faster than pdf-lib
 
 ### Fill and flatten FINTRAC form
 
 | Benchmark       | ops/sec |    Mean |     p99 |    RME | Samples |
 | :-------------- | ------: | ------: | ------: | -----: | ------: |
-| libpdf          |    55.5 | 18.02ms | 23.24ms | ±3.09% |      28 |
+| libpdf          |    58.0 | 17.23ms | 22.98ms | ±3.50% |      30 |
 | pdf-lib         |  FAILED |       - |       - |      - |       0 |
-| @cantoo/pdf-lib |    30.4 | 32.85ms | 42.84ms | ±5.28% |      16 |
+| @cantoo/pdf-lib |    32.1 | 31.18ms | 48.13ms | ±7.61% |      17 |
 
-- **libpdf** is 1.82x faster than @cantoo/pdf-lib
+- **libpdf** is 1.81x faster than @cantoo/pdf-lib
 
 ## Copying
 
 ### Copy pages between documents
 
-| Benchmark                       | ops/sec |   Mean |     p99 |    RME | Samples |
-| :------------------------------ | ------: | -----: | ------: | -----: | ------: |
-| copy 1 page                     |   825.0 | 1.21ms |  2.74ms | ±3.31% |     413 |
-| copy 10 pages from 100-page PDF |   203.0 | 4.93ms |  8.48ms | ±2.80% |     102 |
-| copy all 100 pages              |   120.6 | 8.29ms | 10.70ms | ±1.48% |      61 |
+| Benchmark                       | ops/sec |   Mean |    p99 |    RME | Samples |
+| :------------------------------ | ------: | -----: | -----: | -----: | ------: |
+| copy 1 page                     |   889.4 | 1.12ms | 2.77ms | ±3.21% |     445 |
+| copy 10 pages from 100-page PDF |   213.1 | 4.69ms | 7.37ms | ±2.20% |     107 |
+| copy all 100 pages              |   129.8 | 7.70ms | 8.06ms | ±0.52% |      65 |
 
-- **copy 1 page** is 4.06x faster than copy 10 pages from 100-page PDF
-- **copy 1 page** is 6.84x faster than copy all 100 pages
+- **copy 1 page** is 4.17x faster than copy 10 pages from 100-page PDF
+- **copy 1 page** is 6.85x faster than copy all 100 pages
 
 ### Duplicate pages within same document
 
 | Benchmark                                 | ops/sec |   Mean |    p99 |    RME | Samples |
 | :---------------------------------------- | ------: | -----: | -----: | -----: | ------: |
-| duplicate all pages (double the document) |   957.7 | 1.04ms | 1.47ms | ±0.80% |     479 |
-| duplicate page 0                          |   953.2 | 1.05ms | 1.52ms | ±0.79% |     477 |
+| duplicate page 0                          |   993.3 | 1.01ms | 1.42ms | ±0.76% |     497 |
+| duplicate all pages (double the document) |   985.3 | 1.01ms | 1.38ms | ±0.60% |     493 |
 
-- **duplicate all pages (double the document)** is 1.00x faster than duplicate page 0
+- **duplicate page 0** is 1.01x faster than duplicate all pages (double the document)
 
 ### Merge PDFs
 
 | Benchmark               | ops/sec |    Mean |     p99 |    RME | Samples |
 | :---------------------- | ------: | ------: | ------: | -----: | ------: |
-| merge 2 small PDFs      |   614.8 |  1.63ms |  2.17ms | ±1.01% |     308 |
-| merge 10 small PDFs     |   112.7 |  8.87ms | 12.28ms | ±1.63% |      57 |
-| merge 2 x 100-page PDFs |    66.2 | 15.10ms | 18.10ms | ±1.70% |      34 |
+| merge 2 small PDFs      |   641.7 |  1.56ms |  1.97ms | ±1.09% |     321 |
+| merge 10 small PDFs     |   121.8 |  8.21ms | 11.99ms | ±1.68% |      61 |
+| merge 2 x 100-page PDFs |    69.1 | 14.47ms | 15.26ms | ±0.81% |      35 |
 
-- **merge 2 small PDFs** is 5.45x faster than merge 10 small PDFs
-- **merge 2 small PDFs** is 9.28x faster than merge 2 x 100-page PDFs
+- **merge 2 small PDFs** is 5.27x faster than merge 10 small PDFs
+- **merge 2 small PDFs** is 9.29x faster than merge 2 x 100-page PDFs
 
 ## Drawing
 
 | Benchmark                           | ops/sec |   Mean |    p99 |    RME | Samples |
 | :---------------------------------- | ------: | -----: | -----: | -----: | ------: |
-| draw 100 lines                      |    1.7K |  576us | 1.21ms | ±1.28% |     868 |
-| draw 100 rectangles                 |    1.5K |  651us | 1.52ms | ±3.30% |     768 |
-| draw 100 circles                    |    1.1K |  950us | 1.90ms | ±1.67% |     527 |
-| create 10 pages with mixed content  |   676.6 | 1.48ms | 2.87ms | ±2.14% |     339 |
-| draw 100 text lines (standard font) |   623.1 | 1.60ms | 2.49ms | ±1.48% |     312 |
+| draw 100 lines                      |    1.8K |  566us | 1.19ms | ±1.22% |     884 |
+| draw 100 rectangles                 |    1.5K |  648us | 1.55ms | ±2.56% |     772 |
+| draw 100 circles                    |    1.1K |  913us | 1.67ms | ±1.38% |     548 |
+| create 10 pages with mixed content  |   681.4 | 1.47ms | 2.63ms | ±1.86% |     341 |
+| draw 100 text lines (standard font) |   616.5 | 1.62ms | 3.04ms | ±1.89% |     309 |
 
-- **draw 100 lines** is 1.13x faster than draw 100 rectangles
-- **draw 100 lines** is 1.65x faster than draw 100 circles
-- **draw 100 lines** is 2.57x faster than create 10 pages with mixed content
-- **draw 100 lines** is 2.79x faster than draw 100 text lines (standard font)
+- **draw 100 lines** is 1.15x faster than draw 100 rectangles
+- **draw 100 lines** is 1.61x faster than draw 100 circles
+- **draw 100 lines** is 2.59x faster than create 10 pages with mixed content
+- **draw 100 lines** is 2.87x faster than draw 100 text lines (standard font)
 
 ## Forms
 
 | Benchmark         | ops/sec |    Mean |     p99 |    RME | Samples |
 | :---------------- | ------: | ------: | ------: | -----: | ------: |
-| read field values |   335.8 |  2.98ms |  5.16ms | ±2.59% |     168 |
-| get form fields   |   293.9 |  3.40ms |  7.07ms | ±4.87% |     147 |
-| flatten form      |   119.8 |  8.34ms |  9.45ms | ±1.18% |      60 |
-| fill text fields  |    76.7 | 13.04ms | 18.32ms | ±3.87% |      39 |
+| read field values |   353.0 |  2.83ms |  5.22ms | ±1.67% |     177 |
+| get form fields   |   301.5 |  3.32ms |  7.18ms | ±4.60% |     151 |
+| flatten form      |   125.3 |  7.98ms |  9.31ms | ±1.07% |      63 |
+| fill text fields  |    76.7 | 13.03ms | 17.13ms | ±4.69% |      39 |
 
-- **read field values** is 1.14x faster than get form fields
-- **read field values** is 2.80x faster than flatten form
-- **read field values** is 4.38x faster than fill text fields
+- **read field values** is 1.17x faster than get form fields
+- **read field values** is 2.82x faster than flatten form
+- **read field values** is 4.60x faster than fill text fields
 
 ## Loading
 
 | Benchmark              | ops/sec |    Mean |     p99 |    RME | Samples |
 | :--------------------- | ------: | ------: | ------: | -----: | ------: |
-| load small PDF (888B)  |   15.7K |    64us |   182us | ±5.56% |   7,830 |
-| load medium PDF (19KB) |   11.3K |    89us |   125us | ±0.64% |   5,648 |
-| load form PDF (116KB)  |   769.0 |  1.30ms |  2.43ms | ±1.86% |     385 |
-| load heavy PDF (2.0MB) |    55.6 | 17.98ms | 20.05ms | ±1.62% |      28 |
+| load small PDF (888B)  |   16.3K |    61us |   180us | ±0.92% |   8,175 |
+| load medium PDF (19KB) |   11.0K |    91us |   135us | ±0.51% |   5,496 |
+| load form PDF (116KB)  |   747.4 |  1.34ms |  2.65ms | ±2.23% |     375 |
+| load heavy PDF (2.0MB) |    55.8 | 17.93ms | 19.28ms | ±1.38% |      28 |
 
-- **load small PDF (888B)** is 1.39x faster than load medium PDF (19KB)
-- **load small PDF (888B)** is 20.36x faster than load form PDF (116KB)
-- **load small PDF (888B)** is 281.60x faster than load heavy PDF (2.0MB)
+- **load small PDF (888B)** is 1.49x faster than load medium PDF (19KB)
+- **load small PDF (888B)** is 21.87x faster than load form PDF (116KB)
+- **load small PDF (888B)** is 293.09x faster than load heavy PDF (2.0MB)
 
 ## Saving
 
 | Benchmark                          | ops/sec |    Mean |     p99 |    RME | Samples |
 | :--------------------------------- | ------: | ------: | ------: | -----: | ------: |
-| save unmodified (19KB)             |    8.5K |   118us |   367us | ±1.70% |   4,227 |
-| incremental save (19KB)            |    6.3K |   158us |   316us | ±0.89% |   3,169 |
-| save with modifications (19KB)     |    1.2K |   823us |  1.57ms | ±1.62% |     608 |
-| save heavy PDF (2.0MB)             |    54.5 | 18.36ms | 19.40ms | ±1.31% |      28 |
-| incremental save heavy PDF (2.0MB) |    52.4 | 19.09ms | 21.87ms | ±1.71% |      27 |
+| save unmodified (19KB)             |    9.0K |   111us |   316us | ±1.10% |   4,522 |
+| incremental save (19KB)            |    5.6K |   177us |   371us | ±1.22% |   2,822 |
+| save with modifications (19KB)     |    1.2K |   841us |  1.63ms | ±1.81% |     595 |
+| save heavy PDF (2.0MB)             |    53.8 | 18.60ms | 20.23ms | ±1.08% |      27 |
+| incremental save heavy PDF (2.0MB) |    50.6 | 19.75ms | 20.67ms | ±1.17% |      26 |
 
-- **save unmodified (19KB)** is 1.33x faster than incremental save (19KB)
-- **save unmodified (19KB)** is 6.96x faster than save with modifications (19KB)
-- **save unmodified (19KB)** is 155.23x faster than save heavy PDF (2.0MB)
-- **save unmodified (19KB)** is 161.39x faster than incremental save heavy PDF (2.0MB)
+- **save unmodified (19KB)** is 1.60x faster than incremental save (19KB)
+- **save unmodified (19KB)** is 7.60x faster than save with modifications (19KB)
+- **save unmodified (19KB)** is 168.23x faster than save heavy PDF (2.0MB)
+- **save unmodified (19KB)** is 178.63x faster than incremental save heavy PDF (2.0MB)
 
 ## Splitting
 
@@ -255,32 +255,32 @@
 
 | Benchmark                                | ops/sec |    Mean |     p99 |    RME | Samples |
 | :--------------------------------------- | ------: | ------: | ------: | -----: | ------: |
-| extractPages (1 page from small PDF)     |   853.7 |  1.17ms |  2.86ms | ±3.77% |     427 |
-| extractPages (1 page from 100-page PDF)  |   278.2 |  3.59ms |  4.25ms | ±0.90% |     140 |
-| extractPages (1 page from 2000-page PDF) |    17.9 | 56.01ms | 57.04ms | ±0.84% |      10 |
+| extractPages (1 page from small PDF)     |   863.0 |  1.16ms |  2.96ms | ±3.86% |     432 |
+| extractPages (1 page from 100-page PDF)  |   285.8 |  3.50ms |  4.07ms | ±0.63% |     143 |
+| extractPages (1 page from 2000-page PDF) |    18.1 | 55.36ms | 56.08ms | ±0.46% |      10 |
 
-- **extractPages (1 page from small PDF)** is 3.07x faster than extractPages (1 page from 100-page PDF)
-- **extractPages (1 page from small PDF)** is 47.82x faster than extractPages (1 page from 2000-page PDF)
+- **extractPages (1 page from small PDF)** is 3.02x faster than extractPages (1 page from 100-page PDF)
+- **extractPages (1 page from small PDF)** is 47.77x faster than extractPages (1 page from 2000-page PDF)
 
 ### Split into single-page PDFs
 
 | Benchmark                   | ops/sec |     Mean |      p99 |    RME | Samples |
 | :-------------------------- | ------: | -------: | -------: | -----: | ------: |
-| split 100-page PDF (0.1MB)  |    24.4 |  40.94ms |  45.89ms | ±2.50% |      13 |
-| split 2000-page PDF (0.9MB) |     1.3 | 743.89ms | 743.89ms | ±0.00% |       1 |
+| split 100-page PDF (0.1MB)  |    24.9 |  40.24ms |  43.97ms | ±2.37% |      13 |
+| split 2000-page PDF (0.9MB) |     1.4 | 715.50ms | 715.50ms | ±0.00% |       1 |
 
-- **split 100-page PDF (0.1MB)** is 18.17x faster than split 2000-page PDF (0.9MB)
+- **split 100-page PDF (0.1MB)** is 17.78x faster than split 2000-page PDF (0.9MB)
 
 ### Batch page extraction
 
 | Benchmark                                              | ops/sec |    Mean |     p99 |    RME | Samples |
 | :----------------------------------------------------- | ------: | ------: | ------: | -----: | ------: |
-| extract first 10 pages from 2000-page PDF              |    17.6 | 56.77ms | 58.12ms | ±1.18% |       9 |
-| extract first 100 pages from 2000-page PDF             |    16.4 | 61.11ms | 62.10ms | ±0.78% |       9 |
-| extract every 10th page from 2000-page PDF (200 pages) |    15.0 | 66.60ms | 67.66ms | ±1.17% |       8 |
+| extract first 10 pages from 2000-page PDF              |    17.9 | 56.00ms | 58.06ms | ±1.18% |       9 |
+| extract first 100 pages from 2000-page PDF             |    16.8 | 59.41ms | 60.50ms | ±1.12% |       9 |
+| extract every 10th page from 2000-page PDF (200 pages) |    15.1 | 66.21ms | 70.47ms | ±2.41% |       8 |
 
-- **extract first 10 pages from 2000-page PDF** is 1.08x faster than extract first 100 pages from 2000-page PDF
-- **extract first 10 pages from 2000-page PDF** is 1.17x faster than extract every 10th page from 2000-page PDF (200 pages)
+- **extract first 10 pages from 2000-page PDF** is 1.06x faster than extract first 100 pages from 2000-page PDF
+- **extract first 10 pages from 2000-page PDF** is 1.18x faster than extract every 10th page from 2000-page PDF (200 pages)
 
 ---
 
